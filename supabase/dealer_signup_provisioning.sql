@@ -1,6 +1,8 @@
 -- SupplyDesk: enforce dealer approval at the database boundary.
--- Apply this migration in Supabase SQL Editor after the distributor business row exists.
--- Every public signup is forced to dealer; client-supplied role metadata is ignored.
+-- Apply after schema.sql and production_security.sql. Signup works before business setup.
+-- Public signup is always dealer-only; client-supplied role metadata is ignored.
+alter table public.dealer_profiles alter column distributor_id drop not null;
+
 create or replace function public.provision_public_signup()
 returns trigger
 language plpgsql
@@ -20,11 +22,7 @@ begin
   order by created_at asc
   limit 1;
 
-  if v_distributor_id is null then
-    raise exception 'SupplyDesk owner setup is not complete. Please contact the distributor.';
-  end if;
-
-  v_full_name := coalesce(nullif(trim(new.raw_user_meta_data->>'full_name'), ''), split_part(new.email, '@', 1));
+  v_full_name := coalesce(nullif(trim(new.raw_user_meta_data->>'full_name'), ''), nullif(split_part(coalesce(new.email, ''), '@', 1), ''), 'Dealer');
   v_store_name := coalesce(nullif(trim(new.raw_user_meta_data->>'store_name'), ''), v_full_name);
   v_address := coalesce(nullif(trim(new.raw_user_meta_data->>'address'), ''), 'Not provided');
   v_city := coalesce(nullif(trim(new.raw_user_meta_data->>'city'), ''), 'Not provided');
