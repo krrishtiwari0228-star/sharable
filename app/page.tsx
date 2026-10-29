@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, CheckCircle2, AlertTriangle, Store as StoreIcon } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
@@ -36,6 +36,7 @@ export default function Home() {
   const [loginError, setLoginError] = useState("");
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [resetMode, setResetMode] = useState(false);
+  const recoveryEventRef = useRef(false);
   const [newPassword, setNewPassword] = useState("");
   const [authNotice, setAuthNotice] = useState("");
   const [signupName, setSignupName] = useState("");
@@ -59,10 +60,21 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("workspace") === "admin") setLoginRole("distributor");
+    const supabase = getSupabaseBrowserClient();
+    const authSubscription = supabase?.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        recoveryEventRef.current = true;
+        setResetMode(true);
+        setAuthMode("login");
+        setSignedIn(false);
+      }
+    });
     if (window.location.hash.includes("type=recovery")) {
+      recoveryEventRef.current = true;
       setResetMode(true);
       setAuthMode("login");
     }
+    return () => authSubscription?.data.subscription.unsubscribe();
   }, []);
   // Restore the verified Supabase session; never trust a role stored in browser storage.
   useEffect(() => {
@@ -70,10 +82,11 @@ export default function Home() {
     const restore = async () => {
       try {
         // Recovery links intentionally open the password form; do not route into the workspace first.
-        if (window.location.hash.includes("type=recovery")) return;
+        if (recoveryEventRef.current || window.location.hash.includes("type=recovery")) return;
         const supabase = getSupabaseBrowserClient();
         if (supabase) {
           const { data: { session } } = await supabase.auth.getSession();
+          if (recoveryEventRef.current) return;
           if (session?.user && active) {
             // Repair this user's dealer profile if an earlier signup was incomplete.
             // The database function can only create the least-privileged dealer role.
