@@ -44,46 +44,52 @@ export default function Home() {
   const [mobileNav, setMobileNav] = useState(false);
   const [showCart, setShowCart] = useState(false);
   const [dealerName, setDealerName] = useState("Shree Ganesh Stores");
-  // Demo-only persistence: keep the same browser session and orders after refresh.
-  // This is not a replacement for server authentication or a shared database.
+  // Restore the verified Supabase session; never trust a role stored in browser storage.
   useEffect(() => {
-    try {
-      const savedSession = window.localStorage.getItem("supplydesk-demo-session");
-      if (savedSession) {
-        const session = JSON.parse(savedSession) as { signedIn?: boolean; role?: "dealer" | "distributor"; dealerName?: string; loginEmail?: string };
-        if (session.role === "dealer" || session.role === "distributor") setRole(session.role);
-        if (typeof session.signedIn === "boolean") setSignedIn(session.signedIn);
-        if (typeof session.dealerName === "string") { setDealerName(session.dealerName); setLoginShop(session.dealerName); }
-        if (typeof session.loginEmail === "string") setLoginEmail(session.loginEmail);
-        if (session.role === "dealer") setPage("My Orders");
-        if (session.role === "distributor") setPage("Overview");
+    let active = true;
+    const restore = async () => {
+      try {
+        const supabase = getSupabaseBrowserClient();
+        if (supabase) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user && active) {
+            const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).single();
+            if (profile?.role === "distributor" && active) {
+              setRole("distributor"); setPage("Overview"); setSignedIn(true);
+            } else if (profile?.role === "dealer" && active) {
+              const { data: dealer } = await supabase.from("dealer_profiles").select("store_name,review_status").eq("user_id", session.user.id).single();
+              if (dealer?.review_status === "approved") {
+                setRole("dealer"); setDealerName(dealer.store_name); setLoginShop(dealer.store_name); setPage("My Orders"); setSignedIn(true);
+              } else {
+                await supabase.auth.signOut();
+              }
+            } else if (active) {
+              await supabase.auth.signOut();
+            }
+          }
+        }
+        const savedOrders = window.localStorage.getItem("supplydesk-demo-orders");
+        if (savedOrders) { const parsed = JSON.parse(savedOrders); if (Array.isArray(parsed)) setOrders(parsed); }
+        const savedCart = window.localStorage.getItem("supplydesk-demo-cart");
+        if (savedCart) { const parsed = JSON.parse(savedCart); if (Array.isArray(parsed)) setCart(parsed); }
+      } catch (error) {
+        console.error("Could not restore SupplyDesk data", error);
+      } finally {
+        if (active) setStorageReady(true);
       }
-      const savedOrders = window.localStorage.getItem("supplydesk-demo-orders");
-      if (savedOrders) {
-        const parsed = JSON.parse(savedOrders);
-        if (Array.isArray(parsed)) setOrders(parsed);
-      }
-      const savedCart = window.localStorage.getItem("supplydesk-demo-cart");
-      if (savedCart) {
-        const parsed = JSON.parse(savedCart);
-        if (Array.isArray(parsed)) setCart(parsed);
-      }
-    } catch (error) {
-      console.error("Could not restore SupplyDesk demo data", error);
-    } finally {
-      setStorageReady(true);
-    }
+    };
+    void restore();
+    return () => { active = false; };
   }, []);
   useEffect(() => {
     if (!storageReady) return;
     try {
-      window.localStorage.setItem("supplydesk-demo-session", JSON.stringify({ signedIn, role, dealerName, loginEmail }));
       window.localStorage.setItem("supplydesk-demo-orders", JSON.stringify(orders));
       window.localStorage.setItem("supplydesk-demo-cart", JSON.stringify(cart));
     } catch (error) {
-      console.error("Could not save SupplyDesk demo data", error);
+      console.error("Could not save demo cart state", error);
     }
-  }, [storageReady, signedIn, role, dealerName, loginEmail, orders, cart]);
+  }, [storageReady, orders, cart]);
 
   const cartCount = cart.reduce((n, line) => n + line.qty, 0);
   const cartTotal = cart.reduce((n, line) => n + line.qty * line.product.price, 0);
@@ -145,7 +151,7 @@ export default function Home() {
     <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`}>
       <div className="brand"><div className="brand-mark">s<span>.</span></div><div><strong>supplydesk</strong><small>WHOLESALE HOMEWARE</small></div><button className="icon-btn close-nav" onClick={() => setMobileNav(false)} aria-label="Close navigation"><X size={18}/></button></div>
       <div className="workspace-label">WORKSPACE</div>
-      <div className="signed-in-badge"><span className="signed-in-dot"/><div><strong>{role === "distributor" ? "Distributor Admin" : "Dealer Portal"}</strong><small>{role === "distributor" ? "Business management" : dealerName}</small></div><button onClick={() => { setSignedIn(false); setLoginPassword(""); setLoginError(""); window.localStorage.removeItem("supplydesk-demo-session"); }} aria-label="Sign out" title="Sign out"><ArrowUpRight size={15}/></button></div>
+      <div className="signed-in-badge"><span className="signed-in-dot"/><div><strong>{role === "distributor" ? "Distributor Admin" : "Dealer Portal"}</strong><small>{role === "distributor" ? "Business management" : dealerName}</small></div><button onClick={async () => { const supabase=getSupabaseBrowserClient(); if(supabase) await supabase.auth.signOut(); setSignedIn(false); setLoginPassword(""); setLoginError(""); }} aria-label="Sign out" title="Sign out"><ArrowUpRight size={15}/></button></div>
       <div className="nav-label">{role === "distributor" ? "MANAGE BUSINESS" : "DEALER PORTAL"}</div>
       <nav>{navItems.map(({ name, icon: Icon }) => <button key={name} onClick={() => selectPage(name)} className={`nav-item ${page === name ? "selected" : ""}`}><Icon size={18}/><span>{name}</span>{name === "Orders" && orders.some(o => o.status === "Pending") && <b className="nav-count">{orders.filter(o => o.status === "Pending").length}</b>}{name === "My Cart" && cartCount > 0 && <b className="nav-count">{cartCount}</b>}</button>)}</nav>
       <div className="sidebar-bottom"><div className="help-card"><div className="help-dot"/><strong>Need a hand?</strong><p>Our support team is here to help your business run smoothly.</p><button onClick={() => flash("Support contact: add distributor support details in settings.")}>Contact support <ArrowUpRight size={14}/></button></div><button className="nav-item settings" onClick={() => flash("Settings will be available after account setup.")}><Settings size={18}/>Settings</button><div className="user-mini"><div className="avatar">{role === "distributor" ? "AD" : "SG"}</div><div className="user-info"><strong>{role === "distributor" ? "Admin Distributor" : dealerName}</strong><small>{role === "distributor" ? "Distributor account" : "Approved dealer · Demo"}</small></div><span className="online-dot"/></div></div>
