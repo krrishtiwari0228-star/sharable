@@ -344,3 +344,37 @@ grant execute on function public.dealer_cancel_order(uuid, text) to authenticate
 -- create approved dealer profiles and distributor owner profile through trusted admin tooling;
 -- add and test account provisioning, cancellation-request response rules, and full status transition matrix;
 -- configure email/Realtime notifications, backups, monitoring, rate limits, and incident recovery.
+
+-- Prevent privilege escalation through self-service profile updates.
+create or replace function public.protect_account_privileges()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_table_name = 'profiles' then
+    if new.role is distinct from old.role and coalesce(auth.role(),'') <> 'service_role' then
+      raise exception 'Account role can only be changed by trusted administrator tooling';
+    end if;
+  elsif tg_table_name = 'dealer_profiles' then
+    if auth.uid() = old.user_id and coalesce(auth.role(),'') <> 'service_role' then
+      if new.user_id is distinct from old.user_id
+        or new.distributor_id is distinct from old.distributor_id
+        or new.review_status is distinct from old.review_status
+        or new.reviewed_at is distinct from old.reviewed_at then
+        raise exception 'Dealers cannot change their distributor assignment or approval status';
+      end if;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists protect_profile_privileges on public.profiles;
+create trigger protect_profile_privileges before update on public.profiles
+for each row execute function public.protect_account_privileges();
+
+drop trigger if exists protect_dealer_assignment on public.dealer_profiles;
+create trigger protect_dealer_assignment before update on public.dealer_profiles
+for each row execute function public.protect_account_privileges();
