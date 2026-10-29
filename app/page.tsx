@@ -91,7 +91,7 @@ export default function Home() {
               setPage("Product Catalogue");
               setSignedIn(true);
             } else if (active) {
-              await supabase.auth.signOut();
+              setLoginError("Your account is signed in, but its workspace profile could not be loaded. Try again; do not create a second account.");
             }
           }
         }
@@ -210,9 +210,9 @@ export default function Home() {
         const { error: repairError } = await supabase.rpc("ensure_my_account_profile");
         if (repairError) console.warn("Account profile recovery was unavailable", repairError.message);
         const {data:profile,error:profileError}=await supabase.from("profiles").select("role,full_name").eq("id",authData.user.id).single();
-        if(profileError||!profile){await supabase.auth.signOut();throw new Error("Your email and password are valid, but the account profile is missing. Try again; if it continues, contact support instead of creating another account.");}
+        if(profileError||!profile){throw new Error("Your email and password are valid, but the account profile is missing. Try again; if it continues, contact support instead of creating another account.");}
         const actualRole=profile.role==="distributor"?"distributor":profile.role==="dealer"?"dealer":null;
-        if(!actualRole){await supabase.auth.signOut();throw new Error("This account has an unsupported workspace role. Ask the system administrator to configure it.");}
+        if(!actualRole){throw new Error("This account has an unsupported workspace role. Ask the system administrator to configure it.");}
         if(actualRole==="dealer"){
           const {data:dealerProfile,error:dealerError}=await supabase.from("dealer_profiles").select("store_name,review_status").eq("user_id",authData.user.id).maybeSingle();
           if(dealerError) throw dealerError;
