@@ -144,8 +144,22 @@ export default function Home() {
             const { data, error } = await supabase.auth.signUp({ email: loginEmail.trim(), password: loginPassword, options: { data: { full_name: signupName.trim(), role: "dealer", store_name: signupBusiness.trim(), contact_name: signupName.trim(), address: signupAddress.trim(), city: signupCity.trim() } } });
             if (error) throw error;
             setLoginShop(signupBusiness.trim());
-            setLoginError(data.user ? "Account created, pending distributor approval. You cannot access the dealer portal until the distributor approves your account." : "Check your email to finish registration.");
-            setAuthMode("login");
+            if (data.session && data.user) {
+              // If email confirmation is disabled, Supabase returns a session immediately.
+              // Keep the dealer signed in and show the pending-approval screen.
+              setDealerName(signupBusiness.trim());
+              setReviewStatus("pending");
+              setRole("dealer");
+              setPage("Approval");
+              setSignedIn(true);
+              setLoginPassword("");
+              setLoginError("");
+              flash("Account created. You are signed in and awaiting distributor approval.");
+            } else {
+              // With email confirmation enabled, no session exists until the user verifies.
+              setLoginError("Account created. Check your inbox (and spam folder) for the confirmation email. After confirming, sign in here. Distributor approval is a separate step.");
+              setAuthMode("login");
+            }
           } catch (error) { setLoginError(error instanceof Error ? error.message : "Could not create account."); }
           finally { setAuthBusy(false); }
           return;
