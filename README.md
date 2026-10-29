@@ -12,7 +12,10 @@ A responsive B2B wholesale ordering prototype for crockery, glassware, kitchenwa
 - A platform-owner role is included in the schema design for managing multiple distributor tenants.
 
 ## Current implementation status
-The current UI is a **local demo/prototype**. It uses in-memory sample products and orders; refreshing the page resets changes. The role switch is only a preview tool, not production authentication or tenant isolation. No real notification, order, cancellation, payment or stock transaction is sent to a distributor yet.
+- Supabase Auth is wired into dealer signup and login. Auth users are provisioned with matching profile rows by a database trigger; a restricted self-repair function can recreate a missing dealer profile without granting admin access.
+- Dealer and administrator entry are separate in the UI. The application routes based on the role stored in `public.profiles`, not a role supplied by the browser. A separate administrator Auth user and distributor business row must be provisioned with `supabase/setup_distributor_admin.sql`.
+- The catalogue and order screens are still a **demo/prototype**: sample products and orders are in browser state, and the live database currently has no distributor, category, or product rows. Changes do not yet persist as real business orders.
+- No real notification, order, cancellation, payment or stock transaction is currently sent to a distributor.
 
 ## Stack
 - Next.js App Router + TypeScript
