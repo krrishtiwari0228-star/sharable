@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, CheckCircle2, AlertTriangle, Store as StoreIcon } from "lucide-react";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 type Product = { id: number; name: string; category: string; brand: string; sku: string; unit: string; piecesPerCarton: number; minOrder: number; price: number; stock: number; color: string; mark: string };
 type CartLine = { product: Product; qty: number };
@@ -106,15 +107,38 @@ export default function Home() {
         <button type="button" className={loginRole==="dealer"?"chosen":""} onClick={()=>{setLoginRole("dealer");setLoginError("");}}><StoreIcon/>Dealer <small>Place and track orders</small></button>
         <button type="button" className={loginRole==="distributor"?"chosen":""} onClick={()=>{setLoginRole("distributor");setLoginError("");}}><Boxes size={20}/>Distributor / Admin <small>Manage stock and orders</small></button>
       </div>
-      <form className="login-form" onSubmit={event=>{event.preventDefault();if(!loginEmail.trim()||!loginPassword.trim()||(loginRole==="dealer"&&!loginShop.trim())){setLoginError("Complete all required fields.");return;}if(loginRole==="dealer")setDealerName(loginShop.trim());setRole(loginRole);setPage(loginRole==="dealer"?"Product Catalogue":"Overview");setLoginError("");setSignedIn(true);flash(loginRole==="dealer"?"Dealer demo session started.":"Distributor demo session started.");}}>
-        {loginRole==="dealer"&&<label>Shop / business name<input value={loginShop} onChange={e=>setLoginShop(e.target.value)} placeholder="e.g. Shree Ganesh Stores" required/></label>}
-        <label>Email or username<input value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder={loginRole==="dealer"?"dealer@example.com":"admin@example.com"} autoComplete="username" required/></label>
+      <form className="login-form" onSubmit={async event=>{
+        event.preventDefault();
+        setLoginError("");
+        if(!loginEmail.trim()||!loginPassword.trim()||(loginRole==="dealer"&&!loginShop.trim())){setLoginError("Complete all required fields.");return;}
+        const supabase=getSupabaseBrowserClient();
+        if(!supabase){setLoginError("Production login is not configured yet. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel, then redeploy.");return;}
+        const {data:authData,error:authError}=await supabase.auth.signInWithPassword({email:loginEmail.trim(),password:loginPassword});
+        if(authError||!authData.user){setLoginError("Sign-in failed. Check your email/password or ask the administrator to create your account.");return;}
+        const {data:profile,error:profileError}=await supabase.from("profiles").select("role,full_name").eq("id",authData.user.id).single();
+        if(profileError||!profile){await supabase.auth.signOut();setLoginError("Your account profile is not configured. Contact the distributor administrator.");return;}
+        const actualRole=profile.role==="distributor"?"distributor":profile.role==="dealer"?"dealer":null;
+        if(!actualRole||actualRole!==loginRole){await supabase.auth.signOut();setLoginError("This account does not have the selected portal role.");return;}
+        if(actualRole==="dealer"){
+          const {data:dealerProfile,error:dealerError}=await supabase.from("dealer_profiles").select("store_name,review_status").eq("user_id",authData.user.id).single();
+          if(dealerError||!dealerProfile||dealerProfile.review_status!=="approved"){await supabase.auth.signOut();setLoginError("Dealer account is not approved yet. Contact the distributor.");return;}
+          setDealerName(dealerProfile.store_name);
+          setLoginShop(dealerProfile.store_name);
+          setPage("Product Catalogue");
+        }else setPage("Overview");
+        setRole(actualRole);
+        setSignedIn(true);
+        window.localStorage.removeItem("supplydesk-demo-session");
+        flash("Signed in successfully.");
+      }}>
+        {loginRole==="dealer"&&<label>Shop / business name<input value={loginShop} onChange={e=>setLoginShop(e.target.value)} placeholder="Business name registered with distributor" required/></label>}
+        <label>Email<input type="email" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder={loginRole==="dealer"?"dealer@example.com":"admin@example.com"} autoComplete="username" required/></label>
         <label>Password<input type="password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} placeholder="Enter your password" autoComplete="current-password" required/></label>
         {loginError&&<p className="login-error" role="alert">{loginError}</p>}
         <button className="login-submit" type="submit">Sign in as {loginRole==="dealer"?"Dealer":"Distributor Admin"} <ChevronRight size={17}/></button>
       </form>
       <p className="login-note">Single-distributor setup · Dealer accounts are separate from the distributor account.</p>
-      <p className="login-demo-note">Prototype login only: real account verification must be connected before business use.</p>
+      <p className="login-demo-note">Secure sign-in uses the configured business authentication service. Dealer access requires distributor approval.</p>
     </section>
   </main>;
   return <div className="app-shell">
