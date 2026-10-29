@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, Clock3, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, CheckCircle2, AlertTriangle } from "lucide-react";
 
 type Product = { id: number; name: string; category: string; brand: string; sku: string; unit: string; piecesPerCarton: number; minOrder: number; price: number; stock: number; color: string; mark: string };
 type CartLine = { product: Product; qty: number };
@@ -27,7 +27,7 @@ const money = (n: number) => new Intl.NumberFormat("en-IN", { style: "currency",
 export default function Home() {
   const [role, setRole] = useState<"distributor" | "dealer">("distributor");
   const [page, setPage] = useState("Overview");
-  const [products, setProducts] = useState(initialProducts);
+  const [products] = useState(initialProducts);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All products");
