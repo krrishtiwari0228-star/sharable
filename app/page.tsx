@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, CheckCircle2, AlertTriangle, Store as StoreIcon } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
-type Product = { id: string | number; name: string; category: string; brand: string; sku: string; unit: string; piecesPerCarton: number; minOrder: number; price: number; stock: number; color: string; mark: string; imagePath?: string; isActive?: boolean };
+type Product = { id: string | number; name: string; category: string; brand: string; sku: string; unit: string; piecesPerCarton: number; minOrder: number; price: number; stock: number; color: string; mark: string; imagePath?: string; isActive?: boolean; reservedStock?: number };
 type ProductDraft = { name: string; sku: string; brand: string; category: string; unit: string; piecesPerUnit: string; minimumOrderQuantity: string; price: string; stock: string; imageUrl: string };
 type CartLine = { product: Product; qty: number };
 const initialProducts: Product[] = [
@@ -156,7 +156,7 @@ export default function Home() {
       try {
         const [{ data: categoryRows, error: categoryLoadError }, { data: productRows, error: productLoadError }] = await Promise.all([
           supabase.from("categories").select("id,name"),
-          supabase.from("products").select("id,category_id,sku,name,brand,description,image_path,unit_label,pieces_per_unit,minimum_order_quantity,price,stock_on_hand,is_active")
+          supabase.from("products").select("id,category_id,sku,name,brand,description,image_path,unit_label,pieces_per_unit,minimum_order_quantity,price,stock_on_hand,stock_reserved,is_active")
         ]);
         if (categoryLoadError) throw categoryLoadError;
         if (productLoadError) throw productLoadError;
@@ -174,6 +174,7 @@ export default function Home() {
           minOrder: row.minimum_order_quantity,
           price: Number(row.price),
           stock: Number(row.stock_on_hand) - Number(row.stock_reserved || 0),
+          reservedStock: Number(row.stock_reserved || 0),
           color: palette[index % palette.length],
           mark: "◉",
           imagePath: row.image_path || "",
@@ -188,6 +189,121 @@ export default function Home() {
     void loadProducts();
     return () => { active = false; };
   }, [signedIn, role]);
+  const startNewProduct = () => {
+    setEditingProductId(null);
+    setProductDraft(emptyProductDraft);
+    setProductError("");
+    setProductFormOpen(true);
+  };
+  const startEditProduct = (product: Product) => {
+    setEditingProductId(product.id);
+    setProductDraft({
+      name: product.name,
+      sku: product.sku,
+      brand: product.brand,
+      category: product.category === "Uncategorised" ? "" : product.category,
+      unit: product.unit,
+      piecesPerUnit: String(product.piecesPerCarton),
+      minimumOrderQuantity: String(product.minOrder),
+      price: String(product.price),
+      stock: String(product.stock),
+      imageUrl: product.imagePath || ""
+    });
+    setProductError("");
+    setProductFormOpen(true);
+  };
+  const saveProduct = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setProductError("");
+    if (role !== "distributor") {
+      setProductError("Only the distributor administrator can manage products.");
+      return;
+    }
+    const name = productDraft.name.trim();
+    const sku = productDraft.sku.trim().toUpperCase();
+    const brand = productDraft.brand.trim();
+    const categoryName = productDraft.category.trim();
+    const unit = productDraft.unit;
+    const piecesPerUnit = Number(productDraft.piecesPerUnit);
+    const minimumOrderQuantity = Number(productDraft.minimumOrderQuantity);
+    const price = Number(productDraft.price);
+    const stock = Number(productDraft.stock);
+    if (!name || !sku || !categoryName) { setProductError("Enter product name, SKU and category."); return; }
+    if (!["piece", "box", "carton", "set", "pack"].includes(unit)) { setProductError("Choose a valid selling unit."); return; }
+    if (!Number.isInteger(piecesPerUnit) || piecesPerUnit < 1 || !Number.isInteger(minimumOrderQuantity) || minimumOrderQuantity < 1 || !Number.isInteger(stock) || stock < 0 || !Number.isFinite(price) || price < 0) {
+      setProductError("Check price, stock, pack size and minimum order values.");
+      return;
+    }
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) { setProductError("Supabase is not configured for this deployment."); return; }
+    setProductSaving(true);
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) throw new Error("Your session has expired. Sign in again.");
+      const { data: profile, error: profileError } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+      if (profileError) throw profileError;
+      if (profile?.role !== "distributor") throw new Error("This account is not configured as the distributor administrator.");
+      const { data: distributor, error: distributorError } = await supabase.from("distributors").select("id").eq("owner_id", user.id).eq("is_active", true).maybeSingle();
+      if (distributorError) throw distributorError;
+      if (!distributor?.id) throw new Error("Admin setup is incomplete: this account has no active distributor business yet. Complete the separate admin setup first.");
+      let categoryId: string;
+      const { data: existingCategory, error: categoryLookupError } = await supabase.from("categories").select("id").eq("distributor_id", distributor.id).ilike("name", categoryName).maybeSingle();
+      if (categoryLookupError) throw categoryLookupError;
+      if (existingCategory?.id) {
+        categoryId = existingCategory.id;
+      } else {
+        const { data: newCategory, error: categoryInsertError } = await supabase.from("categories").insert({ distributor_id: distributor.id, name: categoryName }).select("id").single();
+        if (categoryInsertError) throw categoryInsertError;
+        categoryId = newCategory.id;
+      }
+      const currentEditingProduct = editingProductId === null ? undefined : products.find(p => p.id === editingProductId);
+      const productPayload = {
+        distributor_id: distributor.id,
+        category_id: categoryId,
+        sku,
+        name,
+        brand: brand || null,
+        image_path: productDraft.imageUrl.trim() || null,
+        unit_label: unit,
+        pieces_per_unit: piecesPerUnit,
+        minimum_order_quantity: minimumOrderQuantity,
+        price,
+        stock_on_hand: stock + (currentEditingProduct?.reservedStock || 0),
+        is_active: true
+      };
+      let savedId: string | number;
+      if (editingProductId !== null) {
+        const { data: saved, error } = await supabase.from("products").update(productPayload).eq("id", editingProductId).select("id").single();
+        if (error) throw error;
+        savedId = saved.id;
+      } else {
+        const { data: saved, error } = await supabase.from("products").insert(productPayload).select("id").single();
+        if (error) throw error;
+        savedId = saved.id;
+      }
+      const savedProduct: Product = {
+        id: savedId, name, category: categoryName, brand, sku, unit,
+        piecesPerCarton: piecesPerUnit, minOrder: minimumOrderQuantity,
+        price, stock, color: "sage", mark: "◉",
+        imagePath: productDraft.imageUrl.trim(), isActive: true,
+        reservedStock: currentEditingProduct?.reservedStock || 0
+      };
+      setProducts(old => editingProductId === null ? [savedProduct, ...old] : old.map(p => p.id === editingProductId ? savedProduct : p));
+      setCategory(categoryName);
+      setProductDraft(emptyProductDraft);
+      setProductFormOpen(false);
+      setEditingProductId(null);
+      flash(editingProductId === null ? "Product saved to the live catalogue." : "Product changes saved.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not save the product.";
+      setProductError(message.toLowerCase().includes("products_distributor_sku_key") || message.toLowerCase().includes("duplicate key")
+        ? "That SKU already exists in your catalogue. Use a unique SKU for each product."
+        : message);
+    } finally {
+      setProductSaving(false);
+    }
+  };
   const flash = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(""), 3000); };
   const add = (product: Product, delta: number) => setCart(old => { const line = old.find(x => x.product.id === product.id); if (!line && delta > 0) return [...old, { product, qty: Math.min(Math.max(delta, product.minOrder), product.stock) }]; return old.map(x => x.product.id === product.id ? { ...x, qty: Math.max(product.minOrder, Math.min(product.stock, x.qty + delta)) } : x); });
   const updateOrder = (id: string, status: string, reason = "") => { setOrders(old => old.map(o => o.id === id ? { ...o, status, cancelReason: reason || o.cancelReason } : o)); flash(`${id}: ${status === "Cancellation requested" ? "cancellation request sent to distributor" : status === "Cancelled" ? "order cancelled" : `status updated to ${status.toLowerCase()}`}.`); };
