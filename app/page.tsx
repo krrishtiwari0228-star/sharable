@@ -142,7 +142,7 @@ export default function Home() {
             const { data, error } = await supabase.auth.signUp({ email: loginEmail.trim(), password: loginPassword, options: { data: { full_name: signupName.trim(), role: "dealer", store_name: signupBusiness.trim(), contact_name: signupName.trim(), address: signupAddress.trim(), city: signupCity.trim() } } });
             if (error) throw error;
             setLoginShop(signupBusiness.trim());
-            setLoginError(data.user ? "Signup request received. Your dealer profile must be provisioned and approved by the distributor before you can sign in." : "Check your email to finish registration.");
+            setLoginError(data.user ? "Account created, pending distributor approval. You cannot access the dealer portal until the distributor approves your account." : "Check your email to finish registration.");
             setAuthMode("login");
           } catch (error) { setLoginError(error instanceof Error ? error.message : "Could not create account."); }
           finally { setAuthBusy(false); }
