@@ -123,10 +123,7 @@ export default function Home() {
       <div className="login-kicker">BUSINESS PORTAL</div>
       <h1>{authMode === "login" ? "Sign in to your workspace" : "Create your account"}</h1>
       <p className="login-intro">{loginRole === "distributor" ? "Private distributor-owner access." : "Sign in to place and track your wholesale orders."}</p>
-      <div className="login-role-tabs">
-        <button type="button" className={loginRole === "dealer" ? "chosen" : ""} onClick={() => { setLoginRole("dealer"); setLoginError(""); }}>Dealer <small>Shop account</small></button>
-        <button type="button" className={loginRole === "distributor" ? "chosen" : ""} onClick={() => { setLoginRole("distributor"); setLoginError(""); }}>Distributor <small>Owner account</small></button>
-      </div>
+      {loginRole === "distributor" && <p className="login-note">Administrator sign-in</p>}
       <div className="login-role-tabs">
         <button type="button" className={authMode === "login" ? "chosen" : ""} onClick={() => { setAuthMode("login"); setLoginError(""); }}>Login</button>
         <button type="button" className={authMode === "signup" ? "chosen" : ""} onClick={() => { setAuthMode("signup"); setLoginError(""); }}>Create account</button>
