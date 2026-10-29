@@ -35,6 +35,9 @@ export default function Home() {
   const [loginShop, setLoginShop] = useState("");
   const [loginError, setLoginError] = useState("");
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [resetMode, setResetMode] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
   const [signupName, setSignupName] = useState("");
   const [signupBusiness, setSignupBusiness] = useState("");
   const [signupAddress, setSignupAddress] = useState("");
@@ -56,6 +59,10 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("workspace") === "admin") setLoginRole("distributor");
+    if (window.location.hash.includes("type=recovery")) {
+      setResetMode(true);
+      setAuthMode("login");
+    }
   }, []);
   // Restore the verified Supabase session; never trust a role stored in browser storage.
   useEffect(() => {
@@ -66,6 +73,10 @@ export default function Home() {
         if (supabase) {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user && active) {
+            // Repair this user's dealer profile if an earlier signup was incomplete.
+            // The database function can only create the least-privileged dealer role.
+            const { error: repairError } = await supabase.rpc("ensure_my_account_profile");
+            if (repairError) console.warn("Account profile recovery was unavailable", repairError.message);
             const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).single();
             if (profile?.role === "distributor" && active) {
               setRole("distributor"); setPage("Overview"); setSignedIn(true);
@@ -121,18 +132,37 @@ export default function Home() {
     <section className="login-card">
       <div className="login-brand"><div className="brand-mark">s<span>.</span></div><div><strong>supplydesk</strong><small>WHOLESALE HOMEWARE</small></div></div>
       <div className="login-kicker">BUSINESS PORTAL</div>
-      <h1>{authMode === "login" ? "Sign in to your workspace" : "Create your account"}</h1>
-      <p className="login-intro">{loginRole === "distributor" ? "Private distributor-owner access." : "Sign in to place and track your wholesale orders."}</p>
-      {loginRole === "distributor" && <p className="login-note">Administrator sign-in</p>}
-      <div className="login-role-tabs">
-        <button type="button" className={authMode === "login" ? "chosen" : ""} onClick={() => { setAuthMode("login"); setLoginError(""); }}>Login</button>
-        <button type="button" className={authMode === "signup" ? "chosen" : ""} onClick={() => { setAuthMode("signup"); setLoginError(""); }}>Create account</button>
-      </div>
+      <h1>{resetMode ? "Set a new password" : authMode === "login" ? "Sign in to your workspace" : "Create your account"}</h1>
+      <p className="login-intro">{resetMode ? "Choose a new password of at least 8 characters." : loginRole === "distributor" ? "Private administrator access." : "Sign in to place and track your wholesale orders."}</p>
+      {loginRole === "distributor" && !resetMode && <p className="login-note">Administrator sign-in · use your separate admin account.</p>}
+      {!resetMode && <div className="login-role-tabs">
+        <button type="button" className={authMode === "login" ? "chosen" : ""} onClick={() => { setAuthMode("login"); setLoginError(""); setAuthNotice(""); }}>Login</button>
+        {loginRole === "dealer" && <button type="button" className={authMode === "signup" ? "chosen" : ""} onClick={() => { setAuthMode("signup"); setLoginError(""); setAuthNotice(""); }}>Create account</button>}
+      </div>}
       <form className="login-form" onSubmit={async event=>{
         event.preventDefault();
         setLoginError("");
+        setAuthNotice("");
         const supabase = getSupabaseBrowserClient();
         if (!supabase) { setLoginError("Supabase authentication is not configured in Vercel."); return; }
+        if (resetMode) {
+          if (newPassword.length < 8) { setLoginError("Use a password with at least 8 characters."); return; }
+          setAuthBusy(true);
+          try {
+            const { error } = await supabase.auth.updateUser({ password: newPassword });
+            if (error) throw error;
+            await supabase.auth.signOut();
+            setResetMode(false);
+            setNewPassword("");
+            setLoginPassword("");
+            setAuthMode("login");
+            setAuthNotice("Password updated. Sign in with your new password.");
+            window.history.replaceState({}, document.title, window.location.pathname);
+          } catch (error) {
+            setLoginError(error instanceof Error ? error.message : "Could not update password.");
+          } finally { setAuthBusy(false); }
+          return;
+        }
         if (authMode === "signup") {
           if (loginRole === "distributor") { setLoginError("For security, the single distributor-owner account must be provisioned through a protected setup. Public distributor registration is disabled."); return; }
           if (!signupName.trim() || !signupBusiness.trim() || !signupAddress.trim() || !signupCity.trim() || !loginEmail.trim() || loginPassword.length < 8) { setLoginError("Complete all fields and use a password of at least 8 characters."); return; }
@@ -142,12 +172,11 @@ export default function Home() {
             if (error) throw error;
             setLoginShop(signupBusiness.trim());
             if (data.session && data.user) {
-              // If email confirmation is disabled, Supabase returns a session immediately.
-              // Keep the dealer signed in and show the pending-approval screen.
+              // A dealer can enter the catalogue immediately; approval is not a login gate.
               setDealerName(signupBusiness.trim());
               setReviewStatus("pending");
               setRole("dealer");
-              setPage("Approval");
+              setPage("Product Catalogue");
               setSignedIn(true);
               setLoginPassword("");
               setLoginError("");
@@ -157,7 +186,16 @@ export default function Home() {
               setLoginError("Account created. Check your inbox (and spam folder) to confirm your email, then sign in. No distributor approval is required to log in.");
               setAuthMode("login");
             }
-          } catch (error) { setLoginError(error instanceof Error ? error.message : "Could not create account."); }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Could not create account.";
+            const normalized = message.toLowerCase();
+            if (normalized.includes("already registered") || normalized.includes("already exists") || normalized.includes("user already")) {
+              setAuthMode("login");
+              setLoginError("This email already has an account. Use Login with the same password, or choose Forgot password if you need to reset it.");
+            } else {
+              setLoginError(message);
+            }
+          }
           finally { setAuthBusy(false); }
           return;
         }
@@ -166,10 +204,13 @@ export default function Home() {
         try {
         const {data:authData,error:authError}=await supabase.auth.signInWithPassword({email:loginEmail.trim(),password:loginPassword});
         if(authError||!authData.user) throw authError || new Error("Sign-in failed.");
+        // A valid user can restore their own missing dealer profile; role always comes from the database.
+        const { error: repairError } = await supabase.rpc("ensure_my_account_profile");
+        if (repairError) console.warn("Account profile recovery was unavailable", repairError.message);
         const {data:profile,error:profileError}=await supabase.from("profiles").select("role,full_name").eq("id",authData.user.id).single();
-        if(profileError||!profile){await supabase.auth.signOut();throw new Error("Your account profile is not configured. Contact the distributor administrator.");}
+        if(profileError||!profile){await supabase.auth.signOut();throw new Error("Your email and password are valid, but the account profile is missing. Try again; if it continues, contact support instead of creating another account.");}
         const actualRole=profile.role==="distributor"?"distributor":profile.role==="dealer"?"dealer":null;
-        if(!actualRole||actualRole!==loginRole){await supabase.auth.signOut();throw new Error("This account does not have the selected portal role.");}
+        if(!actualRole){await supabase.auth.signOut();throw new Error("This account has an unsupported workspace role. Ask the system administrator to configure it.");}
         if(actualRole==="dealer"){
           const {data:dealerProfile,error:dealerError}=await supabase.from("dealer_profiles").select("store_name,review_status").eq("user_id",authData.user.id).maybeSingle();
           if(dealerError) throw dealerError;
@@ -179,19 +220,48 @@ export default function Home() {
           setPage("Product Catalogue");
         }else setPage("Overview");
         setRole(actualRole); setSignedIn(true); window.localStorage.removeItem("supplydesk-demo-session"); flash("Signed in successfully.");
-        } catch (error) { setLoginError(error instanceof Error ? error.message : "Sign-in failed."); } finally { setAuthBusy(false); }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Sign-in failed.";
+          if (message.toLowerCase().includes("invalid login credentials") || message.toLowerCase().includes("invalid credentials")) {
+            setLoginError("Email or password is incorrect. Try again, or use Forgot password to reset it.");
+          } else {
+            setLoginError(message);
+          }
+        } finally { setAuthBusy(false); }
       }}>
-        {authMode === "signup" && loginRole === "dealer" && <>
-          <label>Full name<input value={signupName} onChange={e=>setSignupName(e.target.value)} placeholder="Your full name" required/></label>
-          <label>Shop / business name<input value={signupBusiness} onChange={e=>setSignupBusiness(e.target.value)} placeholder="Your shop name" required/></label>
-          <label>Business address<input value={signupAddress} onChange={e=>setSignupAddress(e.target.value)} placeholder="Street and area" required/></label>
-          <label>City<input value={signupCity} onChange={e=>setSignupCity(e.target.value)} required/></label>
+        {resetMode ? (
+          <label>New password<input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="new-password" minLength={8} required/></label>
+        ) : <>
+          {authMode === "signup" && loginRole === "dealer" && <>
+            <label>Full name<input value={signupName} onChange={e=>setSignupName(e.target.value)} placeholder="Your full name" required/></label>
+            <label>Shop / business name<input value={signupBusiness} onChange={e=>setSignupBusiness(e.target.value)} placeholder="Your shop name" required/></label>
+            <label>Business address<input value={signupAddress} onChange={e=>setSignupAddress(e.target.value)} placeholder="Street and area" required/></label>
+            <label>City<input value={signupCity} onChange={e=>setSignupCity(e.target.value)} required/></label>
+          </>}
+          {authMode === "login" && loginRole==="dealer"&&<p className="login-note">Use the email and password you registered with. Your shop name is loaded from your account.</p>}
+          <label>Email<input type="email" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder={loginRole==="dealer"?"dealer@example.com":"admin@example.com"} autoComplete="username" required/></label>
+          <label>Password<input type="password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} placeholder={authMode === "signup" ? "At least 8 characters" : "Enter your password"} autoComplete={authMode === "signup" ? "new-password" : "current-password"} minLength={authMode === "signup" ? 8 : undefined} required/></label>
         </>}
-        {authMode === "login" && loginRole==="dealer"&&<p className="login-note">Use the email and password you registered with. Your shop name is loaded from your account.</p>}
-        <label>Email<input type="email" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder={loginRole==="dealer"?"dealer@example.com":"distributor-admin@example.com"} autoComplete="username" required/></label>
-        <label>Password<input type="password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} placeholder={authMode === "signup" ? "At least 8 characters" : "Enter your password"} autoComplete={authMode === "signup" ? "new-password" : "current-password"} minLength={authMode === "signup" ? 8 : undefined} required/></label>
         {loginError&&<p className="login-error" role="alert">{loginError}</p>}
-        <button className="login-submit" type="submit" disabled={authBusy}>{authBusy ? "Please wait…" : authMode === "signup" ? "Create Dealer account" : "Sign in as " + (loginRole==="dealer"?"Dealer":"Distributor Admin")} <ChevronRight size={17}/></button>
+        {authNotice&&<p className="login-note" role="status">{authNotice}</p>}
+        {resetMode ? (
+          <button className="login-submit" type="submit" disabled={authBusy}>{authBusy ? "Saving…" : "Save new password"} <ChevronRight size={17}/></button>
+        ) : <>
+          <button className="login-submit" type="submit" disabled={authBusy}>{authBusy ? "Please wait…" : authMode === "signup" ? "Create Dealer account" : loginRole === "distributor" ? "Sign in to Admin" : "Sign in"} <ChevronRight size={17}/></button>
+          {authMode === "login" && loginRole === "dealer" && <button type="button" className="login-reset" disabled={authBusy} onClick={async () => {
+            setLoginError(""); setAuthNotice("");
+            if (!loginEmail.trim()) { setLoginError("Enter your email address first, then choose Forgot password."); return; }
+            const authClient = getSupabaseBrowserClient();
+            if (!authClient) { setLoginError("Supabase authentication is not configured in Vercel."); return; }
+            setAuthBusy(true);
+            try {
+              const { error } = await authClient.auth.resetPasswordForEmail(loginEmail.trim(), { redirectTo: window.location.origin });
+              if (error) throw error;
+              setAuthNotice("If this email is registered, a password reset link has been sent. Check your inbox and spam folder.");
+            } catch (error) { setLoginError(error instanceof Error ? error.message : "Could not send password reset email."); }
+            finally { setAuthBusy(false); }
+          }}>Forgot password?</button>}
+        </>}
       </form>
       <p className="login-note">Single-distributor setup · Dealer accounts are separate from the distributor account.</p>
       <p className="login-demo-note">Dealer accounts can sign in whenever they want. Distributor approval is not required for login.</p>
