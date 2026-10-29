@@ -26,6 +26,12 @@ const money = (n: number) => new Intl.NumberFormat("en-IN", { style: "currency",
 
 export default function Home() {
   const [role, setRole] = useState<"distributor" | "dealer">("distributor");
+  const [signedIn, setSignedIn] = useState(false);
+  const [loginRole, setLoginRole] = useState<"distributor" | "dealer">("dealer");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginShop, setLoginShop] = useState("");
+  const [loginError, setLoginError] = useState("");
   const [page, setPage] = useState("Overview");
   const [products] = useState(initialProducts);
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -48,6 +54,27 @@ export default function Home() {
   const csvExport = () => { const rows = [["Order ID", "Dealer", "Area", "Products", "Total Pieces", "Order Value (INR)", "Status", "Order Time"], ...orders.filter(o => o.status === "Delivered").map(o => [o.id, o.dealer, o.area, o.products.join("; "), o.pieces, o.amount, o.status, o.time])]; const csv = rows.map(r => r.map(v => `"${String(v).replaceAll('"', '""')}"`).join(",")).join("\r\n"); const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "wholesale-sales-report.csv"; a.click(); URL.revokeObjectURL(url); flash("Sales report exported. Open the CSV file in Excel."); };
   const title = page === "Overview" ? "Good morning, Distributor" : page;
   const isCatalogue = page === "Product Catalogue" || page === "Products & Stock" || page === "Overview";
+  if (!signedIn) return <main className="login-screen">
+    <section className="login-card">
+      <div className="login-brand"><div className="brand-mark">s<span>.</span></div><div><strong>supplydesk</strong><small>WHOLESALE HOMEWARE</small></div></div>
+      <div className="login-kicker">BUSINESS PORTAL</div>
+      <h1>Sign in to your workspace</h1>
+      <p className="login-intro">Choose how you work with the distributor.</p>
+      <div className="login-role-tabs">
+        <button type="button" className={loginRole==="dealer"?"chosen":""} onClick={()=>{setLoginRole("dealer");setLoginError("");}}><StoreIcon/>Dealer <small>Place and track orders</small></button>
+        <button type="button" className={loginRole==="distributor"?"chosen":""} onClick={()=>{setLoginRole("distributor");setLoginError("");}}><Boxes size={20}/>Distributor / Admin <small>Manage stock and orders</small></button>
+      </div>
+      <form className="login-form" onSubmit={event=>{event.preventDefault();if(!loginEmail.trim()||!loginPassword.trim()||(loginRole==="dealer"&&!loginShop.trim())){setLoginError("Complete all required fields.");return;}setDealerName(loginShop.trim()||"Distributor Admin");setRole(loginRole);setPage(loginRole==="dealer"?"Product Catalogue":"Overview");setLoginError("");setSignedIn(true);flash(loginRole==="dealer"?"Dealer demo session started.":"Distributor demo session started.");}}>
+        {loginRole==="dealer"&&<label>Shop / business name<input value={loginShop} onChange={e=>setLoginShop(e.target.value)} placeholder="e.g. Shree Ganesh Stores" required/></label>}
+        <label>Email or username<input value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder={loginRole==="dealer"?"dealer@example.com":"admin@example.com"} autoComplete="username" required/></label>
+        <label>Password<input type="password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} placeholder="Enter your password" autoComplete="current-password" required/></label>
+        {loginError&&<p className="login-error" role="alert">{loginError}</p>}
+        <button className="login-submit" type="submit">Sign in as {loginRole==="dealer"?"Dealer":"Distributor Admin"} <ChevronRight size={17}/></button>
+      </form>
+      <p className="login-note">Single-distributor setup · Dealer accounts are separate from the distributor account.</p>
+      <p className="login-demo-note">Prototype login only: real account verification must be connected before business use.</p>
+    </section>
+  </main>;
   return <div className="app-shell">
     <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`}>
       <div className="brand"><div className="brand-mark">s<span>.</span></div><div><strong>supplydesk</strong><small>WHOLESALE HOMEWARE</small></div><button className="icon-btn close-nav" onClick={() => setMobileNav(false)} aria-label="Close navigation"><X size={18}/></button></div>
