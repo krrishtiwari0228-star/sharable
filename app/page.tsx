@@ -143,6 +143,51 @@ export default function Home() {
   const cartTotal = cart.reduce((n, line) => n + line.qty * line.product.price, 0);
   const productCategories = useMemo(() => ["All products", ...Array.from(new Set(products.map(p => p.category).filter(Boolean))).sort((a,b)=>a.localeCompare(b))], [products]);
   const filtered = useMemo(() => products.filter(p => (category === "All products" || p.category === category) && `${p.name} ${p.sku} ${p.category} ${p.brand}`.toLowerCase().includes(search.toLowerCase())), [products, category, search]);
+
+  // Load only rows visible to the authenticated user's RLS policies.
+  useEffect(() => {
+    if (!signedIn) return;
+    let active = true;
+    const loadProducts = async () => {
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) return;
+      setProductsLoading(true);
+      setProductError("");
+      try {
+        const [{ data: categoryRows, error: categoryLoadError }, { data: productRows, error: productLoadError }] = await Promise.all([
+          supabase.from("categories").select("id,name"),
+          supabase.from("products").select("id,category_id,sku,name,brand,description,image_path,unit_label,pieces_per_unit,minimum_order_quantity,price,stock_on_hand,is_active")
+        ]);
+        if (categoryLoadError) throw categoryLoadError;
+        if (productLoadError) throw productLoadError;
+        if (!active) return;
+        const names = new Map((categoryRows || []).map((row: any) => [row.id, row.name]));
+        const palette = ["sage", "blue", "coral", "sand", "mint", "plum", "gold", "orange"];
+        setProducts((productRows || []).map((row: any, index: number) => ({
+          id: row.id,
+          name: row.name,
+          category: names.get(row.category_id) || "Uncategorised",
+          brand: row.brand || "",
+          sku: row.sku,
+          unit: row.unit_label,
+          piecesPerCarton: row.pieces_per_unit,
+          minOrder: row.minimum_order_quantity,
+          price: Number(row.price),
+          stock: Number(row.stock_on_hand) - Number(row.stock_reserved || 0),
+          color: palette[index % palette.length],
+          mark: "◉",
+          imagePath: row.image_path || "",
+          isActive: row.is_active
+        })));
+      } catch (error) {
+        if (active) setProductError(error instanceof Error ? error.message : "Could not load products from the database.");
+      } finally {
+        if (active) setProductsLoading(false);
+      }
+    };
+    void loadProducts();
+    return () => { active = false; };
+  }, [signedIn, role]);
   const flash = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(""), 3000); };
   const add = (product: Product, delta: number) => setCart(old => { const line = old.find(x => x.product.id === product.id); if (!line && delta > 0) return [...old, { product, qty: Math.min(Math.max(delta, product.minOrder), product.stock) }]; return old.map(x => x.product.id === product.id ? { ...x, qty: Math.max(product.minOrder, Math.min(product.stock, x.qty + delta)) } : x); });
   const updateOrder = (id: string, status: string, reason = "") => { setOrders(old => old.map(o => o.id === id ? { ...o, status, cancelReason: reason || o.cancelReason } : o)); flash(`${id}: ${status === "Cancellation requested" ? "cancellation request sent to distributor" : status === "Cancelled" ? "order cancelled" : `status updated to ${status.toLowerCase()}`}.`); };
