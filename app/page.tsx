@@ -157,7 +157,7 @@ export default function Home() {
               flash("Account created. You are signed in and awaiting distributor approval.");
             } else {
               // With email confirmation enabled, no session exists until the user verifies.
-              setLoginError("Account created. Check your inbox (and spam folder) for the confirmation email. After confirming, sign in here. Distributor approval is a separate step.");
+              setLoginError("Account created. Check your inbox (and spam folder) to confirm your email, then sign in.");
               setAuthMode("login");
             }
           } catch (error) { setLoginError(error instanceof Error ? error.message : "Could not create account."); }
@@ -200,7 +200,6 @@ export default function Home() {
       <p className="login-demo-note">Secure sign-in uses the configured business authentication service. Dealer access requires distributor approval.</p>
     </section>
   </main>;
-  if (role === "dealer" && reviewStatus !== "approved") return <main className="login-screen"><section className="login-card"><div className="login-brand"><div className="brand-mark">s<span>.</span></div><div><strong>supplydesk</strong><small>WHOLESALE HOMEWARE</small></div></div><div className="login-kicker">DEALER ACCOUNT</div><h1>{reviewStatus === "rejected" ? "Application not approved" : reviewStatus === "suspended" ? "Account temporarily suspended" : "Awaiting distributor approval"}</h1><p className="login-intro">{reviewStatus === "rejected" ? "Your dealer application was not approved. Please contact the distributor for details." : reviewStatus === "suspended" ? "Your dealer access is paused. Please contact the distributor." : "You are signed in. Catalogue, prices, stock, orders and order history unlock after distributor approval."}</p><div className="login-error" role="status" style={{marginTop:20}}>{dealerName} · Status: {reviewStatus}</div><button className="login-submit" type="button" onClick={async()=>{const supabase=getSupabaseBrowserClient();if(supabase) await supabase.auth.signOut();setSignedIn(false);setPage("Overview");setReviewStatus("pending");}}>Sign out <ChevronRight size={17}/></button></section></main>;
   return <div className="app-shell">
     <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`}>
       <div className="brand"><div className="brand-mark">s<span>.</span></div><div><strong>supplydesk</strong><small>WHOLESALE HOMEWARE</small></div><button className="icon-btn close-nav" onClick={() => setMobileNav(false)} aria-label="Close navigation"><X size={18}/></button></div>
