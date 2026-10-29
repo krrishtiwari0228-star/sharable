@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, CheckCircle2, AlertTriangle, Store as StoreIcon } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
-type Product = { id: number; name: string; category: string; brand: string; sku: string; unit: string; piecesPerCarton: number; minOrder: number; price: number; stock: number; color: string; mark: string };
+type Product = { id: string | number; name: string; category: string; brand: string; sku: string; unit: string; piecesPerCarton: number; minOrder: number; price: number; stock: number; color: string; mark: string; imagePath?: string; isActive?: boolean };
+type ProductDraft = { name: string; sku: string; brand: string; category: string; unit: string; piecesPerUnit: string; minimumOrderQuantity: string; price: string; stock: string; imageUrl: string };
 type CartLine = { product: Product; qty: number };
 const initialProducts: Product[] = [
   { id: 1, name: "Royal White Dinner Plate", category: "Crockery", brand: "Casa Royale", sku: "CR-101", unit: "carton", piecesPerCarton: 24, minOrder: 1, price: 960, stock: 42, color: "sage", mark: "◉" },
@@ -45,7 +46,14 @@ export default function Home() {
   const [signupCity, setSignupCity] = useState("Pune");
   const [authBusy, setAuthBusy] = useState(false);
   const [page, setPage] = useState("Overview");
-  const [products] = useState(initialProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productError, setProductError] = useState("");
+  const [productFormOpen, setProductFormOpen] = useState(false);
+  const [productSaving, setProductSaving] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | number | null>(null);
+  const emptyProductDraft: ProductDraft = { name: "", sku: "", brand: "", category: "", unit: "carton", piecesPerUnit: "1", minimumOrderQuantity: "1", price: "", stock: "0", imageUrl: "" };
+  const [productDraft, setProductDraft] = useState<ProductDraft>(emptyProductDraft);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All products");
@@ -133,6 +141,7 @@ export default function Home() {
 
   const cartCount = cart.reduce((n, line) => n + line.qty, 0);
   const cartTotal = cart.reduce((n, line) => n + line.qty * line.product.price, 0);
+  const productCategories = useMemo(() => ["All products", ...Array.from(new Set(products.map(p => p.category).filter(Boolean))).sort((a,b)=>a.localeCompare(b))], [products]);
   const filtered = useMemo(() => products.filter(p => (category === "All products" || p.category === category) && `${p.name} ${p.sku} ${p.category} ${p.brand}`.toLowerCase().includes(search.toLowerCase())), [products, category, search]);
   const flash = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(""), 3000); };
   const add = (product: Product, delta: number) => setCart(old => { const line = old.find(x => x.product.id === product.id); if (!line && delta > 0) return [...old, { product, qty: Math.min(Math.max(delta, product.minOrder), product.stock) }]; return old.map(x => x.product.id === product.id ? { ...x, qty: Math.max(product.minOrder, Math.min(product.stock, x.qty + delta)) } : x); });
