@@ -49,7 +49,8 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
   const [showCart, setShowCart] = useState(false);
-  const [dealerName, setDealerName] = useState("Shree Ganesh Stores");
+  const [dealerName, setDealerName] = useState("");
+  const [reviewStatus, setReviewStatus] = useState<"pending" | "approved" | "rejected" | "suspended">("pending");
   // Admin sign-in is kept off the dealer-facing screen. The distributor can open
   // /?workspace=admin directly; authorization still depends on Supabase credentials and role.
   useEffect(() => {
@@ -70,11 +71,12 @@ export default function Home() {
               setRole("distributor"); setPage("Overview"); setSignedIn(true);
             } else if (profile?.role === "dealer" && active) {
               const { data: dealer } = await supabase.from("dealer_profiles").select("store_name,review_status").eq("user_id", session.user.id).single();
-              if (dealer?.review_status === "approved") {
-                setRole("dealer"); setDealerName(dealer.store_name); setLoginShop(dealer.store_name); setPage("My Orders"); setSignedIn(true);
-              } else {
-                await supabase.auth.signOut();
-              }
+              setRole("dealer");
+              setDealerName(dealer?.store_name || "Your shop");
+              setLoginShop(dealer?.store_name || "");
+              setReviewStatus(dealer?.review_status || "pending");
+              setPage(dealer?.review_status === "approved" ? "Product Catalogue" : "Approval");
+              setSignedIn(true);
             } else if (active) {
               await supabase.auth.signOut();
             }
@@ -148,7 +150,7 @@ export default function Home() {
           finally { setAuthBusy(false); }
           return;
         }
-        if(!loginEmail.trim()||!loginPassword.trim()||(loginRole==="dealer"&&!loginShop.trim())){setLoginError("Complete all required fields.");return;}
+        if(!loginEmail.trim()||!loginPassword.trim()){setLoginError("Enter your email and password.");return;}
         setAuthBusy(true);
         try {
         const {data:authData,error:authError}=await supabase.auth.signInWithPassword({email:loginEmail.trim(),password:loginPassword});
@@ -158,9 +160,12 @@ export default function Home() {
         const actualRole=profile.role==="distributor"?"distributor":profile.role==="dealer"?"dealer":null;
         if(!actualRole||actualRole!==loginRole){await supabase.auth.signOut();throw new Error("This account does not have the selected portal role.");}
         if(actualRole==="dealer"){
-          const {data:dealerProfile,error:dealerError}=await supabase.from("dealer_profiles").select("store_name,review_status").eq("user_id",authData.user.id).single();
-          if(dealerError||!dealerProfile||dealerProfile.review_status!=="approved"){await supabase.auth.signOut();throw new Error("Dealer account is not approved yet. Contact the distributor.");}
-          setDealerName(dealerProfile.store_name); setLoginShop(dealerProfile.store_name); setPage("Product Catalogue");
+          const {data:dealerProfile,error:dealerError}=await supabase.from("dealer_profiles").select("store_name,review_status").eq("user_id",authData.user.id).maybeSingle();
+          if(dealerError) throw dealerError;
+          setDealerName(dealerProfile?.store_name || "Your shop");
+          setLoginShop(dealerProfile?.store_name || "");
+          setReviewStatus(dealerProfile?.review_status || "pending");
+          setPage(dealerProfile?.review_status === "approved" ? "Product Catalogue" : "Approval");
         }else setPage("Overview");
         setRole(actualRole); setSignedIn(true); window.localStorage.removeItem("supplydesk-demo-session"); flash("Signed in successfully.");
         } catch (error) { setLoginError(error instanceof Error ? error.message : "Sign-in failed."); } finally { setAuthBusy(false); }
@@ -181,6 +186,7 @@ export default function Home() {
       <p className="login-demo-note">Secure sign-in uses the configured business authentication service. Dealer access requires distributor approval.</p>
     </section>
   </main>;
+  if (role === "dealer" && reviewStatus !== "approved") return <main className="login-screen"><section className="login-card"><div className="login-brand"><div className="brand-mark">s<span>.</span></div><div><strong>supplydesk</strong><small>WHOLESALE HOMEWARE</small></div></div><div className="login-kicker">DEALER ACCOUNT</div><h1>{reviewStatus === "rejected" ? "Application not approved" : reviewStatus === "suspended" ? "Account temporarily suspended" : "Awaiting distributor approval"}</h1><p className="login-intro">{reviewStatus === "rejected" ? "Your dealer application was not approved. Please contact the distributor for details." : reviewStatus === "suspended" ? "Your dealer access is paused. Please contact the distributor." : "You are signed in. Catalogue, prices, stock, orders and order history unlock after distributor approval."}</p><div className="login-error" role="status" style={{marginTop:20}}>{dealerName} · Status: {reviewStatus}</div><button className="login-submit" type="button" onClick={async()=>{const supabase=getSupabaseBrowserClient();if(supabase) await supabase.auth.signOut();setSignedIn(false);setPage("Overview");setReviewStatus("pending");}}>Sign out <ChevronRight size={17}/></button></section></main>;
   return <div className="app-shell">
     <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`}>
       <div className="brand"><div className="brand-mark">s<span>.</span></div><div><strong>supplydesk</strong><small>WHOLESALE HOMEWARE</small></div><button className="icon-btn close-nav" onClick={() => setMobileNav(false)} aria-label="Close navigation"><X size={18}/></button></div>
