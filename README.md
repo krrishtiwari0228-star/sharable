@@ -14,8 +14,8 @@ A responsive B2B wholesale ordering prototype for crockery, glassware, kitchenwa
 ## Current implementation status
 - Supabase Auth is wired into dealer signup and login. Auth users are provisioned with matching profile rows by a database trigger; a restricted self-repair function can recreate a missing dealer profile without granting admin access.
 - Dealer and administrator entry are separate in the UI. The application routes based on the role stored in `public.profiles`, not a role supplied by the browser. A separate administrator Auth user and distributor business row must be provisioned with `supabase/setup_distributor_admin.sql`.
-- The catalogue and order screens are still a **demo/prototype**: sample products and orders are in browser state, and the live database currently has no distributor, category, or product rows. Changes do not yet persist as real business orders.
-- No real notification, order, cancellation, payment or stock transaction is currently sent to a distributor.
+- Distributor product creation and editing are wired to Supabase: names, SKU, category, brand, image URL, unit, pack size, minimum order, price and stock are saved to the live product/category tables. This requires the separate admin account and distributor business to be provisioned first; no distributor/product records currently exist in the live database.
+- Cart, orders, order status, sales export and notifications remain a demo/prototype and are not yet persisted as real business transactions.
 
 ## Stack
 - Next.js App Router + TypeScript
