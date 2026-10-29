@@ -176,7 +176,7 @@ export default function Home() {
           <label>Business address<input value={signupAddress} onChange={e=>setSignupAddress(e.target.value)} placeholder="Street and area" required/></label>
           <label>City<input value={signupCity} onChange={e=>setSignupCity(e.target.value)} required/></label>
         </>}
-        {authMode === "login" && loginRole==="dealer"&&<label>Shop / business name<input value={loginShop} onChange={e=>setLoginShop(e.target.value)} placeholder="Business name registered with distributor" required/></label>}
+        {authMode === "login" && loginRole==="dealer"&&<p className="login-note">Use the email and password you registered with. Your shop name is loaded from your account.</p>}
         <label>Email<input type="email" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder={loginRole==="dealer"?"dealer@example.com":"distributor-admin@example.com"} autoComplete="username" required/></label>
         <label>Password<input type="password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} placeholder={authMode === "signup" ? "At least 8 characters" : "Enter your password"} autoComplete={authMode === "signup" ? "new-password" : "current-password"} minLength={authMode === "signup" ? 8 : undefined} required/></label>
         {loginError&&<p className="login-error" role="alert">{loginError}</p>}
