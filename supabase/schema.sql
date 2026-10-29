@@ -36,7 +36,7 @@ create table public.distributors (
 
 create table public.dealer_profiles (
   user_id uuid primary key references public.profiles(id) on delete cascade,
-  distributor_id uuid not null references public.distributors(id) on delete restrict,
+  distributor_id uuid references public.distributors(id) on delete restrict,
   store_name text not null,
   contact_name text not null,
   address text not null,
