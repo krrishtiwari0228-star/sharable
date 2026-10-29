@@ -75,7 +75,7 @@ export default function Home() {
               setDealerName(dealer?.store_name || "Your shop");
               setLoginShop(dealer?.store_name || "");
               setReviewStatus(dealer?.review_status || "pending");
-              setPage(dealer?.review_status === "approved" ? "Product Catalogue" : "Approval");
+              setPage("Product Catalogue");
               setSignedIn(true);
             } else if (active) {
               await supabase.auth.signOut();
@@ -154,10 +154,10 @@ export default function Home() {
               setSignedIn(true);
               setLoginPassword("");
               setLoginError("");
-              flash("Account created. You are signed in and awaiting distributor approval.");
+              flash("Account created. You are signed in.");
             } else {
               // With email confirmation enabled, no session exists until the user verifies.
-              setLoginError("Account created. Check your inbox (and spam folder) to confirm your email, then sign in.");
+              setLoginError("Account created. Check your inbox (and spam folder) to confirm your email, then sign in. No distributor approval is required to log in.");
               setAuthMode("login");
             }
           } catch (error) { setLoginError(error instanceof Error ? error.message : "Could not create account."); }
@@ -179,7 +179,7 @@ export default function Home() {
           setDealerName(dealerProfile?.store_name || "Your shop");
           setLoginShop(dealerProfile?.store_name || "");
           setReviewStatus(dealerProfile?.review_status || "pending");
-          setPage(dealerProfile?.review_status === "approved" ? "Product Catalogue" : "Approval");
+          setPage("Product Catalogue");
         }else setPage("Overview");
         setRole(actualRole); setSignedIn(true); window.localStorage.removeItem("supplydesk-demo-session"); flash("Signed in successfully.");
         } catch (error) { setLoginError(error instanceof Error ? error.message : "Sign-in failed."); } finally { setAuthBusy(false); }
@@ -197,7 +197,7 @@ export default function Home() {
         <button className="login-submit" type="submit" disabled={authBusy}>{authBusy ? "Please wait…" : authMode === "signup" ? "Create Dealer account" : "Sign in as " + (loginRole==="dealer"?"Dealer":"Distributor Admin")} <ChevronRight size={17}/></button>
       </form>
       <p className="login-note">Single-distributor setup · Dealer accounts are separate from the distributor account.</p>
-      <p className="login-demo-note">Secure sign-in uses the configured business authentication service. Dealer access requires distributor approval.</p>
+      <p className="login-demo-note">Dealer accounts can sign in whenever they want. Distributor approval is not required for login.</p>
     </section>
   </main>;
   return <div className="app-shell">
