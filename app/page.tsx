@@ -69,6 +69,8 @@ export default function Home() {
     let active = true;
     const restore = async () => {
       try {
+        // Recovery links intentionally open the password form; do not route into the workspace first.
+        if (window.location.hash.includes("type=recovery")) return;
         const supabase = getSupabaseBrowserClient();
         if (supabase) {
           const { data: { session } } = await supabase.auth.getSession();
