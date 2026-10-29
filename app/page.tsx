@@ -44,6 +44,12 @@ export default function Home() {
   const [mobileNav, setMobileNav] = useState(false);
   const [showCart, setShowCart] = useState(false);
   const [dealerName, setDealerName] = useState("Shree Ganesh Stores");
+  // Admin sign-in is kept off the dealer-facing screen. The distributor can open
+  // /?workspace=admin directly; authorization still depends on Supabase credentials and role.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("workspace") === "admin") setLoginRole("distributor");
+  }, []);
   // Restore the verified Supabase session; never trust a role stored in browser storage.
   useEffect(() => {
     let active = true;
@@ -108,11 +114,8 @@ export default function Home() {
       <div className="login-brand"><div className="brand-mark">s<span>.</span></div><div><strong>supplydesk</strong><small>WHOLESALE HOMEWARE</small></div></div>
       <div className="login-kicker">BUSINESS PORTAL</div>
       <h1>Sign in to your workspace</h1>
-      <p className="login-intro">Choose how you work with the distributor.</p>
-      <div className="login-role-tabs">
-        <button type="button" className={loginRole==="dealer"?"chosen":""} onClick={()=>{setLoginRole("dealer");setLoginError("");}}><StoreIcon/>Dealer <small>Place and track orders</small></button>
-        <button type="button" className={loginRole==="distributor"?"chosen":""} onClick={()=>{setLoginRole("distributor");setLoginError("");}}><Boxes size={20}/>Distributor / Admin <small>Manage stock and orders</small></button>
-      </div>
+      <p className="login-intro">{loginRole === "distributor" ? "Private distributor administration sign-in." : "Sign in to place and track your wholesale orders."}</p>
+      {loginRole === "distributor" && <p className="login-note">Administrator access</p>}
       <form className="login-form" onSubmit={async event=>{
         event.preventDefault();
         setLoginError("");
@@ -138,7 +141,7 @@ export default function Home() {
         flash("Signed in successfully.");
       }}>
         {loginRole==="dealer"&&<label>Shop / business name<input value={loginShop} onChange={e=>setLoginShop(e.target.value)} placeholder="Business name registered with distributor" required/></label>}
-        <label>Email<input type="email" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder={loginRole==="dealer"?"dealer@example.com":"admin@example.com"} autoComplete="username" required/></label>
+        <label>Email<input type="email" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder={loginRole==="dealer"?"dealer@example.com":"distributor-admin@example.com"} autoComplete="username" required/></label>
         <label>Password<input type="password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} placeholder="Enter your password" autoComplete="current-password" required/></label>
         {loginError&&<p className="login-error" role="alert">{loginError}</p>}
         <button className="login-submit" type="submit">Sign in as {loginRole==="dealer"?"Dealer":"Distributor Admin"} <ChevronRight size={17}/></button>
