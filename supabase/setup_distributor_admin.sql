@@ -57,6 +57,15 @@ begin
     set business_name = excluded.business_name,
         contact_email = excluded.contact_email,
         is_active = true;
+
+  -- Attach existing unassigned dealer profiles to this distributor once it exists.
+  update public.dealer_profiles
+  set distributor_id = (
+    select d.id from public.distributors d
+    where d.owner_id = v_user_id and d.is_active = true
+    limit 1
+  )
+  where distributor_id is null;
 end;
 $setup$;
 
