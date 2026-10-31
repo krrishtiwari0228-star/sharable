@@ -13,7 +13,6 @@ const money = (n: number) => new Intl.NumberFormat("en-IN", { style: "currency",
 export default function Home() {
   const [role, setRole] = useState<"distributor" | "dealer">("distributor");
   const [signedIn, setSignedIn] = useState(false);
-  const [storageReady, setStorageReady] = useState(false);
   const [loginRole, setLoginRole] = useState<"distributor" | "dealer">("dealer");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -111,7 +110,6 @@ export default function Home() {
       } catch (error) {
         console.error("Could not restore SupplyDesk data", error);
       } finally {
-        if (active) setStorageReady(true);
       }
     };
     void restore();
