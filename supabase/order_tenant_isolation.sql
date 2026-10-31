@@ -39,7 +39,6 @@ WITH CHECK (
     WHERE dp.user_id = (SELECT auth.uid())
       AND dp.user_id = orders.dealer_id
       AND dp.distributor_id = orders.distributor_id
-      AND dp.review_status = 'approved'
   )
 );
 
