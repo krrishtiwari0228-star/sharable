@@ -46,6 +46,8 @@ export default function Home() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [orderError, setOrderError] = useState("");
   const [orderBusy, setOrderBusy] = useState(false);
+  const [dealers, setDealers] = useState<any[]>([]);
+  const [dealersLoading, setDealersLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
   const [showCart, setShowCart] = useState(false);
@@ -109,7 +111,6 @@ export default function Home() {
         window.localStorage.removeItem("supplydesk-demo-cart");
       } catch (error) {
         console.error("Could not restore SupplyDesk data", error);
-      } finally {
       }
     };
     void restore();
@@ -135,6 +136,35 @@ export default function Home() {
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, [signedIn]);
+
+  useEffect(() => {
+    if (!signedIn || role !== "distributor") return;
+    let active = true;
+    const loadDealers = async () => {
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) return;
+      setDealersLoading(true);
+      const { data, error } = await supabase.from("dealer_profiles").select("user_id,store_name,contact_name,address,city,review_status,created_at").order("created_at", { ascending: false });
+      if (active) {
+        if (error) flash(error.message);
+        else setDealers(data || []);
+        setDealersLoading(false);
+      }
+    };
+    void loadDealers();
+    return () => { active = false; };
+  }, [signedIn, role, catalogueRefreshKey]);
+
+  const reviewDealer = async (userId: string, reviewStatus: "approved" | "rejected") => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("dealer_profiles").update({
+      review_status: reviewStatus, reviewed_at: new Date().toISOString()
+    }).eq("user_id", userId);
+    if (error) { flash(error.message); return; }
+    setCatalogueRefreshKey(value => value + 1);
+    flash(reviewStatus === "approved" ? "Dealer approved. They can now place orders." : "Dealer rejected.");
+  };
 
   // Load real orders and item snapshots; database RLS scopes them to the signed-in workspace.
   useEffect(() => {
@@ -596,10 +626,10 @@ export default function Home() {
           {productsLoading ? <div className="empty-state"><Package size={28}/><h3>Loading catalogue</h3><p>Checking products saved in your business account.</p></div> : <><div className="product-grid">{filtered.map(p=><article className="product-card" key={p.id}><div className={`product-visual ${p.color}`}><span className="product-category">{p.category}</span>{p.imagePath ? <img className="product-image" src={p.imagePath} alt={p.name} loading="lazy"/> : <div className="product-illustration">{p.mark}</div>}<span className={p.stock<20?"stock-label low":"stock-label"}>{p.stock<1?"Out of stock":p.stock<20?"Low stock":`${p.stock} ${p.unit}s in stock`}</span></div><div className="product-info"><div className="sku">{p.brand ? p.brand+" · " : ""}SKU {p.sku}</div><h3>{p.name}</h3><p>{p.piecesPerCarton} pieces per {p.unit} · Min. {p.minOrder}</p><div className="product-buy"><div><strong>{money(p.price)}</strong><small>per {p.unit.toLowerCase()}</small></div>{role === "dealer" ? <button className="add-btn" disabled={p.stock<p.minOrder} onClick={()=>{add(p,p.minOrder);flash(`${p.name} added to cart`);}}><Plus size={16}/> Add</button> : <button className="btn btn-outline product-edit-btn" type="button" onClick={()=>startEditProduct(p)}><Settings size={14}/> Edit</button>}</div>{role === "dealer" && cart.some(x=>x.product.id===p.id) && <div className="inline-quantity"><button onClick={()=>add(p,-1)} aria-label="Decrease quantity"><Minus size={13}/></button><span>{cart.find(x=>x.product.id===p.id)?.qty} in cart</span><button onClick={()=>add(p,1)} aria-label="Increase quantity"><Plus size={13}/></button></div>}</div></article>)}</div>{filtered.length===0&&<div className="empty-state"><Package size={30}/><h3>{productsLoading ? "Loading products" : search || category !== "All products" ? "No products found" : "No products yet"}</h3><p>{search || category !== "All products" ? "Try another search or category." : role === "distributor" ? "Select Add product above to publish your first item." : "Your distributor has not published products yet."}</p>{role === "distributor" && page === "Products & Stock" && <button className="btn btn-primary" onClick={startNewProduct}><Plus size={16}/> Add product</button>}</div>}</>}
         </section>}
         {role === "distributor" && page === "Sales & Excel" && <section className="panel full-panel"><div className="panel-head"><div><h2>Delivered sales ledger</h2><p>Only delivered orders count as completed sales.</p></div><button className="btn btn-primary" onClick={csvExport}><FileSpreadsheet size={16}/> Export CSV for Excel</button></div><div className="sales-summary"><div><span>Completed sales value</span><strong>{money(orders.filter(o=>o.status==="Delivered").reduce((n,o)=>n+o.amount,0))}</strong></div><div><span>Delivered orders</span><strong>{orders.filter(o=>o.status==="Delivered").length}</strong></div><div><span>Pieces delivered</span><strong>{orders.filter(o=>o.status==="Delivered").reduce((n,o)=>n+o.pieces,0)}</strong></div></div><OrderTable orders={orders.filter(o=>o.status==="Delivered")} updateOrder={updateOrder}/></section>}
-        {role === "distributor" && page === "Dealers" && <section className="panel full-panel"><div className="panel-head"><div><h2>Dealer accounts</h2><p>Dealer accounts linked to your distributor.</p></div><button className="btn btn-outline" onClick={()=>flash("Dealer invitations require backend setup.")}><Plus size={16}/> Invite dealer</button></div><div className="dealer-row"><div className="avatar">SG</div><div className="dealer-details"><strong>Shree Ganesh Stores</strong><small>Kothrud, Pune · dealer@example.com</small></div><span className="status status-accepted">Approved</span><button className="icon-btn subtle" onClick={()=>flash("Connect Supabase to manage dealer accounts.")}><ChevronRight size={17}/></button></div><div className="dealer-row"><div className="avatar avatar-blue">SP</div><div className="dealer-details"><strong>Sai Provision Store</strong><small>Bibwewadi, Pune · dealer@example.com</small></div><span className="status status-pending">Pending review</span><button className="btn btn-outline small-btn" onClick={()=>flash("Dealer approval will be saved once backend is connected.")}>Review</button></div></section>}
+        {role === "distributor" && page === "Dealers" && <section className="panel full-panel"><div className="panel-head"><div><h2>Dealer accounts</h2><p>Review dealers linked to your distributor account.</p></div><span className="soft-count">{dealers.length} dealers</span></div>{dealersLoading ? <p className="helper-note">Loading dealer accounts…</p> : dealers.length === 0 ? <div className="empty-table">No dealers are linked to this distributor yet.</div> : dealers.map((d:any) => <div className="dealer-row" key={d.user_id}><div className="avatar">{String(d.store_name || "D").slice(0,2).toUpperCase()}</div><div className="dealer-details"><strong>{d.store_name || "Unnamed shop"}</strong><small>{[d.contact_name,d.address,d.city].filter(Boolean).join(" · ")}</small></div><span className={`status status-${String(d.review_status).replaceAll("_","-")}`}>{String(d.review_status).replaceAll("_"," ")}</span>{d.review_status === "pending" ? <div className="row-actions"><button className="accept-btn" onClick={()=>reviewDealer(d.user_id,"approved")} title="Approve dealer"><Check size={15}/></button><button className="reject-btn" onClick={()=>reviewDealer(d.user_id,"rejected")} title="Reject dealer"><X size={15}/></button></div> : <span className="table-time">—</span>}</div>)}</section>}
         {role === "dealer" && page === "My Orders" && <section className="panel full-panel"><div className="panel-head"><div><h2>Your orders</h2><p>Follow each order from placement to delivery.</p></div></div>{orderError && <p className="login-error">{orderError}</p>}{ordersLoading ? <p className="helper-note">Loading your orders…</p> : <OrderTable orders={orders} updateOrder={updateOrder} dealerMode/>}</section>}
         {role === "distributor" && page === "Settings" && <section className="panel account-panel"><div className="panel-head"><div><h2>Account settings</h2><p>Administrator access and workspace information.</p></div></div><div className="account-setting-row"><span>Workspace</span><strong>Distributor Admin</strong></div><div className="account-setting-row"><span>Authentication</span><strong>Supabase account</strong></div><p className="login-note">Your administrator login is separate from dealer accounts. Business and catalogue setup is managed through the configured distributor record.</p><button className="btn btn-outline account-signout" onClick={async () => { const supabase=getSupabaseBrowserClient(); if(supabase) await supabase.auth.signOut(); setSignedIn(false); setLoginPassword(""); setLoginError(""); }}>Sign out</button></section>}
-        {role === "dealer" && page === "My Account" && <section className="panel account-panel"><div className="panel-head"><div><h2>Shop profile</h2><p>Details used for order and delivery updates.</p></div></div><label className="form-label">Shop / store name<input value={dealerName} onChange={e=>setDealerName(e.target.value)} /></label><label className="form-label">Contact name<input defaultValue="Shop Owner" /></label><label className="form-label">Mobile number<input placeholder="Enter mobile number" /></label><label className="form-label">Delivery address<textarea placeholder="Shop address, area, city and PIN code" rows={3}/></label><button className="btn btn-primary" onClick={()=>flash("Profile changes are local to this demo; connect backend to save.")}>Save profile</button></section>}
+        {role === "dealer" && page === "My Account" && <section className="panel account-panel"><div className="panel-head"><div><h2>Shop profile</h2><p>Details used for order and delivery updates.</p></div></div><label className="form-label">Shop / store name<input value={dealerName} onChange={e=>setDealerName(e.target.value)} /></label><label className="form-label">Contact name<input defaultValue="Shop Owner" /></label><label className="form-label">Mobile number<input placeholder="Enter mobile number" /></label><label className="form-label">Delivery address<textarea placeholder="Shop address, area, city and PIN code" rows={3}/></label><button className="btn btn-primary" onClick={()=>flash("Profile saving is not yet connected.")}>Save profile</button></section>}
         <footer className="footer"><span>© 2026 SupplyDesk <span className="footer-dot">·</span> Built for better distribution.</span><span><i/> Connected workspace</span></footer>
       </div>
     </main>
