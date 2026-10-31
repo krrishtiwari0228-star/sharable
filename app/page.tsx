@@ -406,9 +406,9 @@ export default function Home() {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) throw sessionError;
       if (!session?.access_token) throw new Error("Your session expired. Sign in again.");
-      const { data: dealer, error: dealerError } = await supabase.from("dealer_profiles").select("address,city,pin_code,review_status").eq("user_id", session.user.id).single();
+      const { data: dealer, error: dealerError } = await supabase.from("dealer_profiles").select("address,city,pin_code,distributor_id").eq("user_id", session.user.id).single();
       if (dealerError) throw dealerError;
-      if (dealer.review_status !== "approved") throw new Error("Your dealer account is pending distributor approval. You can sign in, but ordering becomes available after approval.");
+      if (!dealer.distributor_id) throw new Error("Your dealer account is not linked to a distributor yet. Contact support to connect your account.");
       const deliveryAddress = [dealer.address, dealer.city, dealer.pin_code].filter(Boolean).join(", ");
       if (!deliveryAddress.trim()) throw new Error("Add your delivery address before placing an order.");
       const response = await fetch("/api/orders", {
