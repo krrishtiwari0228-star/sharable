@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
   // Never accept distributor_id or dealer_id from the request body.
   const { data: dealer, error: dealerError } = await supabase
     .from("dealer_profiles")
-    .select("user_id, distributor_id, review_status, address, city, pin_code")
+    .select("user_id, distributor_id")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -184,10 +184,6 @@ export async function POST(request: NextRequest) {
   if (!dealer || !dealer.distributor_id) {
     return jsonError("Your dealer account is not assigned to a distributor.", 403);
   }
-  if (dealer.review_status !== "approved") {
-    return jsonError("Your dealer account must be approved before ordering.", 403);
-  }
-
   // The database function re-derives auth.uid(), validates product ownership,
   // locks stock rows, calculates prices, reserves stock and writes order items
   // in one transaction. It never trusts a distributor ID supplied by the browser.
