@@ -39,6 +39,7 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productError, setProductError] = useState("");
+  const [catalogueRefreshKey, setCatalogueRefreshKey] = useState(0);
   const [productFormOpen, setProductFormOpen] = useState(false);
   const [productSaving, setProductSaving] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | number | null>(null);
@@ -135,6 +136,20 @@ export default function Home() {
   const productCategories = useMemo(() => ["All products", ...Array.from(new Set(products.map(p => p.category).filter(Boolean))).sort((a,b)=>a.localeCompare(b))], [products]);
   const filtered = useMemo(() => products.filter(p => (category === "All products" || p.category === category) && `${p.name} ${p.sku} ${p.category} ${p.brand}`.toLowerCase().includes(search.toLowerCase())), [products, category, search]);
 
+  // Refresh the live catalogue whenever the app becomes visible again (e.g. returning to the tab).
+  useEffect(() => {
+    if (!signedIn) return;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") setCatalogueRefreshKey(value => value + 1);
+    };
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [signedIn]);
+
   // Load only rows visible to the authenticated user's RLS policies.
   useEffect(() => {
     if (!signedIn) return;
@@ -147,7 +162,7 @@ export default function Home() {
       try {
         const [{ data: categoryRows, error: categoryLoadError }, { data: productRows, error: productLoadError }] = await Promise.all([
           supabase.from("categories").select("id,name"),
-          supabase.from("products").select("id,category_id,sku,name,brand,description,image_path,unit_label,pieces_per_unit,minimum_order_quantity,price,stock_on_hand,stock_reserved,is_active")
+          supabase.from("products").select("id,category_id,sku,name,brand,description,image_path,unit_label,pieces_per_unit,minimum_order_quantity,price,stock_on_hand,stock_reserved,is_active").eq("is_active", true)
         ]);
         if (categoryLoadError) throw categoryLoadError;
         if (productLoadError) throw productLoadError;
@@ -179,7 +194,7 @@ export default function Home() {
     };
     void loadProducts();
     return () => { active = false; };
-  }, [signedIn, role]);
+  }, [signedIn, role, catalogueRefreshKey]);
   const startNewProduct = () => {
     setEditingProductId(null);
     setProductDraft(emptyProductDraft);
@@ -300,7 +315,7 @@ export default function Home() {
   const updateOrder = (id: string, status: string, reason = "") => { setOrders(old => old.map(o => o.id === id ? { ...o, status, cancelReason: reason || o.cancelReason } : o)); flash(`${id}: ${status === "Cancellation requested" ? "cancellation request sent to distributor" : status === "Cancelled" ? "order cancelled" : `status updated to ${status.toLowerCase()}`}.`); };
   const placeOrder = () => { if (role !== "dealer" || !cart.length) return; const id = `ORD-${1049 + orders.length - 4}`; const order = { id, dealer: dealerName, area: "Pune, Maharashtra", items: cart.length, pieces: cart.reduce((n, line) => n + line.qty * line.product.piecesPerCarton, 0), products: cart.map(line => `${line.product.name} × ${line.qty} ${line.product.unit}${line.qty > 1 ? "s" : ""}`), cancelReason: "", amount: cartTotal, status: "Pending", time: "Just now" }; setOrders(old => [order, ...old]); setCart([]); setShowCart(false); setPage("My Orders"); flash(`Order ${id} placed. Waiting for distributor confirmation (demo).`); };
   const navItems = role === "distributor" ? [{ name: "Overview", icon: LayoutDashboard }, { name: "Orders", icon: ClipboardList }, { name: "Products & Stock", icon: Boxes }, { name: "Dealers", icon: Users }, { name: "Sales & Excel", icon: FileSpreadsheet }] : [{ name: "Product Catalogue", icon: Package }, { name: "My Orders", icon: ClipboardList }, { name: "My Account", icon: CircleUserRound }];
-  const selectPage = (name: string) => { setPage(name); setMobileNav(false); if (name === "My Cart") setShowCart(true); };
+  const selectPage = (name: string) => { setPage(name); setMobileNav(false); if (name === "My Cart") setShowCart(true); if (name === "Product Catalogue" || name === "Products & Stock") setCatalogueRefreshKey(value => value + 1); };
   const csvExport = () => { const rows = [["Order ID", "Dealer", "Area", "Products", "Total Pieces", "Order Value (INR)", "Status", "Order Time"], ...orders.filter(o => o.status === "Delivered").map(o => [o.id, o.dealer, o.area, o.products.join("; "), o.pieces, o.amount, o.status, o.time])]; const csv = rows.map(r => r.map(v => `"${String(v).replaceAll('"', '""')}"`).join(",")).join("\r\n"); const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "wholesale-sales-report.csv"; a.click(); URL.revokeObjectURL(url); flash("Sales report exported. Open the CSV file in Excel."); };
   const title = page === "Overview" ? "Good morning, Distributor" : page;
   const isCatalogue = page === "Product Catalogue" || page === "Products & Stock" || page === "Overview";
