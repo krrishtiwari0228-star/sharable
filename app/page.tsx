@@ -311,6 +311,10 @@ export default function Home() {
       <h1>{resetMode ? "Set a new password" : authMode === "login" ? "Sign in to your workspace" : "Create your account"}</h1>
       <p className="login-intro">{resetMode ? "Choose a new password of at least 8 characters." : authMode === "signup" ? (loginRole === "distributor" ? "Create your distributor business workspace." : "Create an account to place and track wholesale orders.") : loginRole === "distributor" ? "Distributor business login." : "Sign in to place and track your wholesale orders."}</p>
       {loginRole === "distributor" && !resetMode && <p className="login-note">{authMode === "signup" ? "Register your distributor business to get your own workspace." : "Sign in to manage your distributor business."}</p>}
+      {!resetMode && <div className="workspace-tabs" aria-label="Choose workspace">
+        <button type="button" className={loginRole === "dealer" ? "active" : ""} onClick={() => { setLoginRole("dealer"); setAuthMode("login"); setLoginError(""); setAuthNotice(""); }}>Dealer</button>
+        <button type="button" className={loginRole === "distributor" ? "active" : ""} onClick={() => { setLoginRole("distributor"); setAuthMode("login"); setLoginError(""); setAuthNotice(""); }}>Distributor</button>
+      </div>}
       {!resetMode && <div className="login-role-tabs">
         <button type="button" className={authMode === "login" ? "chosen" : ""} onClick={() => { setAuthMode("login"); setLoginError(""); setAuthNotice(""); }}>Login</button>
         <button type="button" className={authMode === "signup" ? "chosen" : ""} onClick={() => { setAuthMode("signup"); setLoginError(""); setAuthNotice(""); }}>Create account</button>
