@@ -33,6 +33,7 @@ export default function Home() {
   const [signupBusiness, setSignupBusiness] = useState("");
   const [signupAddress, setSignupAddress] = useState("");
   const [signupCity, setSignupCity] = useState("Pune");
+  const [signupPhone, setSignupPhone] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
   const [page, setPage] = useState("Overview");
   const [products, setProducts] = useState<Product[]>([]);
@@ -308,11 +309,11 @@ export default function Home() {
       <div className="login-brand"><div className="brand-mark">s<span>.</span></div><div><strong>supplydesk</strong><small>WHOLESALE HOMEWARE</small></div></div>
       <div className="login-kicker">BUSINESS PORTAL</div>
       <h1>{resetMode ? "Set a new password" : authMode === "login" ? "Sign in to your workspace" : "Create your account"}</h1>
-      <p className="login-intro">{resetMode ? "Choose a new password of at least 8 characters." : loginRole === "distributor" ? "Private administrator access." : "Sign in to place and track your wholesale orders."}</p>
-      {loginRole === "distributor" && !resetMode && <p className="login-note">Administrator sign-in · use your separate admin account.</p>}
+      <p className="login-intro">{resetMode ? "Choose a new password of at least 8 characters." : authMode === "signup" ? (loginRole === "distributor" ? "Create your distributor business workspace." : "Create an account to place and track wholesale orders.") : loginRole === "distributor" ? "Distributor business login." : "Sign in to place and track your wholesale orders."}</p>
+      {loginRole === "distributor" && !resetMode && <p className="login-note">{authMode === "signup" ? "Register your distributor business to get your own workspace." : "Sign in to manage your distributor business."}</p>}
       {!resetMode && <div className="login-role-tabs">
         <button type="button" className={authMode === "login" ? "chosen" : ""} onClick={() => { setAuthMode("login"); setLoginError(""); setAuthNotice(""); }}>Login</button>
-        {loginRole === "dealer" && <button type="button" className={authMode === "signup" ? "chosen" : ""} onClick={() => { setAuthMode("signup"); setLoginError(""); setAuthNotice(""); }}>Create account</button>}
+        <button type="button" className={authMode === "signup" ? "chosen" : ""} onClick={() => { setAuthMode("signup"); setLoginError(""); setAuthNotice(""); }}>Create account</button>
       </div>}
       <form className="login-form" onSubmit={async event=>{
         event.preventDefault();
@@ -339,26 +340,29 @@ export default function Home() {
           return;
         }
         if (authMode === "signup") {
-          if (loginRole === "distributor") { setLoginError("For security, the single distributor-owner account must be provisioned through a protected setup. Public distributor registration is disabled."); return; }
-          if (!signupName.trim() || !signupBusiness.trim() || !signupAddress.trim() || !signupCity.trim() || !loginEmail.trim() || loginPassword.length < 8) { setLoginError("Complete all fields and use a password of at least 8 characters."); return; }
+          const isDistributorSignup = loginRole === "distributor";
+          if (!signupName.trim() || !signupBusiness.trim() || !signupAddress.trim() || (!isDistributorSignup && !signupCity.trim()) || !loginEmail.trim() || loginPassword.length < 8) { setLoginError("Complete all required fields and use a password of at least 8 characters."); return; }
           setAuthBusy(true);
           try {
-            const { data, error } = await supabase.auth.signUp({ email: loginEmail.trim(), password: loginPassword, options: { data: { full_name: signupName.trim(), role: "dealer", store_name: signupBusiness.trim(), contact_name: signupName.trim(), address: signupAddress.trim(), city: signupCity.trim() } } });
+            const metadata = isDistributorSignup
+              ? { account_type: "distributor", full_name: signupName.trim(), business_name: signupBusiness.trim(), address: signupAddress.trim(), phone: signupPhone.trim() }
+              : { account_type: "dealer", full_name: signupName.trim(), role: "dealer", store_name: signupBusiness.trim(), contact_name: signupName.trim(), address: signupAddress.trim(), city: signupCity.trim(), phone: signupPhone.trim() };
+            const { data, error } = await supabase.auth.signUp({ email: loginEmail.trim(), password: loginPassword, options: { data: metadata } });
             if (error) throw error;
-            setLoginShop(signupBusiness.trim());
             if (data.session && data.user) {
-              // A dealer can enter the catalogue immediately; approval is not a login gate.
-              setDealerName(signupBusiness.trim());
-              setReviewStatus("pending");
-              setRole("dealer");
-              setPage("Product Catalogue");
-              setSignedIn(true);
-              setLoginPassword("");
-              setLoginError("");
-              flash("Account created. You are signed in.");
+              if (isDistributorSignup) {
+                setRole("distributor"); setPage("Overview"); setSignedIn(true);
+                flash("Distributor account created. Welcome to SupplyDesk.");
+              } else {
+                setLoginShop(signupBusiness.trim()); setDealerName(signupBusiness.trim()); setReviewStatus("pending");
+                setRole("dealer"); setPage("Product Catalogue"); setSignedIn(true);
+                flash("Dealer account created. You are signed in.");
+              }
+              setLoginPassword(""); setLoginError("");
             } else {
-              // With email confirmation enabled, no session exists until the user verifies.
-              setLoginError("Account created. Check your inbox (and spam folder) to confirm your email, then sign in. No distributor approval is required to log in.");
+              setLoginError(isDistributorSignup
+                ? "Distributor account created. Check your inbox (and spam folder) to confirm your email, then sign in."
+                : "Account created. Check your inbox (and spam folder) to confirm your email, then sign in. No distributor approval is required to log in.");
               setAuthMode("login");
             }
           } catch (error) {
@@ -367,11 +371,8 @@ export default function Home() {
             if (normalized.includes("already registered") || normalized.includes("already exists") || normalized.includes("user already")) {
               setAuthMode("login");
               setLoginError("This email already has an account. Use Login with the same password, or choose Forgot password if you need to reset it.");
-            } else {
-              setLoginError(message);
-            }
-          }
-          finally { setAuthBusy(false); }
+            } else setLoginError(message);
+          } finally { setAuthBusy(false); }
           return;
         }
         if(!loginEmail.trim()||!loginPassword.trim()){setLoginError("Enter your email and password.");return;}
@@ -407,11 +408,12 @@ export default function Home() {
         {resetMode ? (
           <label>New password<input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="new-password" minLength={8} required/></label>
         ) : <>
-          {authMode === "signup" && loginRole === "dealer" && <>
-            <label>Full name<input value={signupName} onChange={e=>setSignupName(e.target.value)} placeholder="Your full name" required/></label>
-            <label>Shop / business name<input value={signupBusiness} onChange={e=>setSignupBusiness(e.target.value)} placeholder="Your shop name" required/></label>
+          {authMode === "signup" && <>
+            <label>Full name<input value={signupName} onChange={e=>setSignupName(e.target.value)} placeholder="Your full name" autoComplete="name" required/></label>
+            <label>{loginRole === "distributor" ? "Distributor business name" : "Shop / business name"}<input value={signupBusiness} onChange={e=>setSignupBusiness(e.target.value)} placeholder={loginRole === "distributor" ? "Your distributor business" : "Your shop name"} required/></label>
+            <label>Mobile number<input type="tel" value={signupPhone} onChange={e=>setSignupPhone(e.target.value)} placeholder="Your contact number" autoComplete="tel"/></label>
             <label>Business address<input value={signupAddress} onChange={e=>setSignupAddress(e.target.value)} placeholder="Street and area" required/></label>
-            <label>City<input value={signupCity} onChange={e=>setSignupCity(e.target.value)} required/></label>
+            {loginRole === "dealer" && <label>City<input value={signupCity} onChange={e=>setSignupCity(e.target.value)} required/></label>}
           </>}
           {authMode === "login" && loginRole==="dealer"&&<p className="login-note">Use the email and password you registered with. Your shop name is loaded from your account.</p>}
           <label>Email<input type="email" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder={loginRole==="dealer"?"dealer@example.com":"admin@example.com"} autoComplete="username" required/></label>
@@ -422,7 +424,7 @@ export default function Home() {
         {resetMode ? (
           <button className="login-submit" type="submit" disabled={authBusy}>{authBusy ? "Saving…" : "Save new password"} <ChevronRight size={17}/></button>
         ) : <>
-          <button className="login-submit" type="submit" disabled={authBusy}>{authBusy ? "Please wait…" : authMode === "signup" ? "Create Dealer account" : loginRole === "distributor" ? "Sign in to Admin" : "Sign in"} <ChevronRight size={17}/></button>
+          <button className="login-submit" type="submit" disabled={authBusy}>{authBusy ? "Please wait…" : authMode === "signup" ? (loginRole === "distributor" ? "Create Distributor account" : "Create Dealer account") : loginRole === "distributor" ? "Sign in to Distributor" : "Sign in"} <ChevronRight size={17}/></button>
           {authMode === "login" && loginRole === "dealer" && <button type="button" className="login-reset" disabled={authBusy} onClick={async () => {
             setLoginError(""); setAuthNotice("");
             if (!loginEmail.trim()) { setLoginError("Enter your email address first, then choose Forgot password."); return; }
@@ -438,8 +440,8 @@ export default function Home() {
           }}>Forgot password?</button>}
         </>}
       </form>
-      <p className="login-note">Single-distributor setup · Dealer accounts are separate from the distributor account.</p>
-      <p className="login-demo-note">Dealer accounts can sign in whenever they want. Distributor approval is not required for login.</p>
+      <p className="login-note">Dealer and distributor workspaces are separate. Your account type is assigned securely during registration.</p>
+      {loginRole === "dealer" && <p className="login-demo-note">Dealer accounts can sign in whenever they want. Distributor approval is not required for login.</p>}
     </section>
   </main>;
   return <div className="app-shell">
