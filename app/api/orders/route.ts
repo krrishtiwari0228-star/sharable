@@ -151,6 +151,7 @@ export async function POST(request: NextRequest) {
   }
 
   const normalizedItems: OrderItemInput[] = [];
+  const seenProductIds = new Set<string>();
   for (const item of items) {
     if (
       !item ||
@@ -162,6 +163,10 @@ export async function POST(request: NextRequest) {
     ) {
       return jsonError("An order item has an invalid product ID or quantity.", 400);
     }
+    if (seenProductIds.has(item.product_id)) {
+      return jsonError("Each product must appear only once in the order.", 400);
+    }
+    seenProductIds.add(item.product_id);
     normalizedItems.push({
       product_id: item.product_id,
       quantity: item.quantity,
