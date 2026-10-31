@@ -176,21 +176,21 @@ export default function Home() {
       setOrdersLoading(true);
       setOrderError("");
       try {
-        const [{ data: orderRows, error: orderLoadError }, { data: itemRows, error: itemLoadError }, { data: dealerRows, error: dealerLoadError }] = await Promise.all([
-          supabase.from("orders").select("id,order_number,dealer_id,delivery_address,status,cancellation_reason,grand_total,created_at"),
-          supabase.from("order_items").select("order_id,product_name_snapshot,unit_label_snapshot,pieces_per_unit_snapshot,quantity,line_total"),
-          supabase.from("dealer_profiles").select("user_id,store_name,city")
-        ]);
-        if (orderLoadError) throw orderLoadError;
-        if (itemLoadError) throw itemLoadError;
-        if (dealerLoadError) throw dealerLoadError;
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!session?.access_token) throw new Error("Your session expired. Sign in again.");
+        const response = await fetch("/api/orders", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          cache: "no-store"
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Could not load orders.");
         if (!active) return;
-        const dealerMap = new Map((dealerRows || []).map((d: any) => [d.user_id, d]));
-        const itemMap = new Map<string, any[]>();
-        for (const item of itemRows || []) itemMap.set(item.order_id, [...(itemMap.get(item.order_id) || []), item]);
-        setOrders((orderRows || []).map((o: any) => {
-          const dealer: any = dealerMap.get(o.dealer_id);
-          const items = itemMap.get(o.id) || [];
+        setOrders((payload.orders || []).map((o: any) => {
+          const dealerValue = o.dealer_profiles;
+          const dealer: any = Array.isArray(dealerValue) ? dealerValue[0] : dealerValue;
+          const items: any[] = o.order_items || [];
           const status = String(o.status || "pending").replaceAll("_", " ").replace(/\b\w/g, (m: string) => m.toUpperCase());
           return {
             id: o.id, orderNumber: `ORD-${o.order_number}`,
@@ -403,17 +403,25 @@ export default function Home() {
     if (!supabase) { flash("Database connection is unavailable."); return; }
     setOrderBusy(true);
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!user) throw new Error("Your session expired. Sign in again.");
-      const { data: dealer, error: dealerError } = await supabase.from("dealer_profiles").select("address,city,pin_code,review_status").eq("user_id", user.id).single();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!session?.access_token) throw new Error("Your session expired. Sign in again.");
+      const { data: dealer, error: dealerError } = await supabase.from("dealer_profiles").select("address,city,pin_code,review_status").eq("user_id", session.user.id).single();
       if (dealerError) throw dealerError;
       if (dealer.review_status !== "approved") throw new Error("Your dealer account is pending distributor approval. You can sign in, but ordering becomes available after approval.");
       const deliveryAddress = [dealer.address, dealer.city, dealer.pin_code].filter(Boolean).join(", ");
       if (!deliveryAddress.trim()) throw new Error("Add your delivery address before placing an order.");
-      const p_items = cart.map(line => ({ product_id: String(line.product.id), quantity: line.qty }));
-      const { error } = await supabase.rpc("place_wholesale_order", { p_items, p_delivery_address: deliveryAddress, p_dealer_note: null });
-      if (error) throw error;
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          items: cart.map(line => ({ product_id: String(line.product.id), quantity: line.qty })),
+          delivery_address: deliveryAddress,
+          dealer_note: null
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not place your order.");
       setCart([]); setShowCart(false); setPage("My Orders");
       setCatalogueRefreshKey(value => value + 1);
       flash("Order placed successfully and sent to your distributor.");
