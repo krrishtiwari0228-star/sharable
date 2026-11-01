@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config({ path: process.env.DOTENV_CONFIG_PATH || ".env.local" });
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 
