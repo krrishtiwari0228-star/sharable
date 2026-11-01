@@ -89,9 +89,13 @@ function findSku(line: OCRLine) {
   return { sku: match[0], word };
 }
 
+function numericText(word: OCRWord) {
+  return word.text.replace(/,/g, "").replace(/[₹]|rs\.?|inr/gi, "").trim();
+}
+
 function parsePrice(word?: OCRWord) {
   if (!word) return null;
-  const raw = word.text.replace(/,/g, "").replace(/[₹]|rs\.?|inr/gi, "").trim();
+  const raw = numericText(word);
   if (!/^\d{3,7}(?:\.\d{1,2})?$/.test(raw)) return null;
   const value = Number(raw);
   if (!Number.isFinite(value) || value < 10 || value > 1000000) return null;
@@ -150,13 +154,13 @@ function candidateRows(lines: OCRLine[], page: number, pageWidth: number, pageHe
     const titleLine = findTitle(lines, line, pageHeight);
     const name = titleLine ? titleCase(titleLine.text.replace(/[|]/g, " ").replace(/\s+/g, " ").trim()) : "";
     const rowWords = line.words.filter((word) => word.left >= found.word.left && word.left > pageWidth * 0.52);
-    const numeric = rowWords.filter((word) => /^\d{3,7}(?:\.\d{1,2})?$/.test(word.text.replace(/,/g, ""))).sort((a, b) => b.left - a.left);
-    const fallbackNumeric = line.words.filter((word) => word.left > found.word.left && /^\d{3,7}(?:\.\d{1,2})?$/.test(word.text.replace(/,/g, ""))).sort((a, b) => b.left - a.left);
+    const numeric = rowWords.filter((word) => /^\d{3,7}(?:\.\d{1,2})?$/.test(numericText(word))).sort((a, b) => b.left - a.left);
+    const fallbackNumeric = line.words.filter((word) => word.left > found.word.left && /^\d{3,7}(?:\.\d{1,2})?$/.test(numericText(word))).sort((a, b) => b.left - a.left);
     const priceWord = numeric[0] || fallbackNumeric[0];
     const price = parsePrice(priceWord) || "";
     const size = rowSize(line.text, found.sku);
     const masterPack = rowMasterPack(line.text, size);
-    const confidence = Math.round(Math.min(found.word.confidence, priceWord?.confidence ?? 0));
+    const confidence = Math.round(Math.min(found.word.confidence, priceWord?.confidence ?? 0, titleLine?.confidence ?? 0));
     const category = detectedCategory;
     const row = { sku: found.sku, name, category, size, masterPack, price, confidence, y: (line.y0 + line.y1) / 2 };
     const sameGroup = groups[groups.length - 1];
