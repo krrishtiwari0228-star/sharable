@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, CheckCircle2, AlertTriangle, Store as StoreIcon } from "lucide-react";
+import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, CheckCircle2, AlertTriangle, Store as StoreIcon, Upload } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
-type Product = { id: string | number; name: string; category: string; brand: string; sku: string; unit: string; piecesPerCarton: number; minOrder: number; price: number; stock: number; color: string; mark: string; imagePath?: string; isActive?: boolean; reservedStock?: number };
-type ProductDraft = { name: string; sku: string; brand: string; category: string; unit: string; piecesPerUnit: string; minimumOrderQuantity: string; price: string; stock: string; imageUrl: string };
+type Product = { id: string | number; name: string; category: string; brand: string; sku: string; unit: string; piecesPerCarton: number; minOrder: number; price: number; stock: number; color: string; mark: string; imagePath?: string; description?: string; isActive?: boolean; reservedStock?: number };
+type ProductDraft = { name: string; sku: string; brand: string; category: string; unit: string; piecesPerUnit: string; minimumOrderQuantity: string; price: string; stock: string; imageUrl: string; description: string };
 type CartLine = { product: Product; qty: number };
 type WholesaleOrder = { id: string; orderNumber: string; dealer: string; area: string; items: number; pieces: number; products: string[]; cancelReason: string; amount: number; status: string; time: string };
 const money = (n: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
@@ -37,7 +37,7 @@ export default function Home() {
   const [productFormOpen, setProductFormOpen] = useState(false);
   const [productSaving, setProductSaving] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | number | null>(null);
-  const emptyProductDraft: ProductDraft = { name: "", sku: "", brand: "", category: "", unit: "carton", piecesPerUnit: "1", minimumOrderQuantity: "1", price: "", stock: "0", imageUrl: "" };
+  const emptyProductDraft: ProductDraft = { name: "", sku: "", brand: "", category: "", unit: "carton", piecesPerUnit: "1", minimumOrderQuantity: "1", price: "", stock: "0", imageUrl: "", description: "" };
   const [productDraft, setProductDraft] = useState<ProductDraft>(emptyProductDraft);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [search, setSearch] = useState("");
@@ -245,6 +245,7 @@ export default function Home() {
           color: palette[index % palette.length],
           mark: "◉",
           imagePath: row.image_path || "",
+          description: row.description || "",
           isActive: row.is_active
         })));
       } catch (error) {
@@ -268,6 +269,7 @@ export default function Home() {
       name: product.name,
       sku: product.sku,
       brand: product.brand,
+      description: product.description || "",
       category: product.category === "Uncategorised" ? "" : product.category,
       unit: product.unit,
       piecesPerUnit: String(product.piecesPerCarton),
@@ -289,6 +291,7 @@ export default function Home() {
     const name = productDraft.name.trim();
     const sku = productDraft.sku.trim().toUpperCase();
     const brand = productDraft.brand.trim();
+    const description = productDraft.description.trim();
     const categoryName = productDraft.category.trim();
     const unit = productDraft.unit;
     const piecesPerUnit = Number(productDraft.piecesPerUnit);
@@ -331,6 +334,7 @@ export default function Home() {
         sku,
         name,
         brand: brand || null,
+        description: description || null,
         image_path: productDraft.imageUrl.trim() || null,
         unit_label: unit,
         pieces_per_unit: piecesPerUnit,
@@ -350,7 +354,7 @@ export default function Home() {
         savedId = saved.id;
       }
       const savedProduct: Product = {
-        id: savedId, name, category: categoryName, brand, sku, unit,
+        id: savedId, name, category: categoryName, brand, sku, unit, description,
         piecesPerCarton: piecesPerUnit, minOrder: minimumOrderQuantity,
         price, stock, color: "sage", mark: "◉",
         imagePath: productDraft.imageUrl.trim(), isActive: true,
@@ -607,7 +611,7 @@ export default function Home() {
         </>}
         {role === "distributor" && page === "Orders" && <section className="panel full-panel"><div className="panel-head"><div><h2>All orders</h2><p>Accept, process and complete dealer orders.</p></div><span className="soft-count">{orders.length} orders</span></div>{orderError && <p className="login-error">{orderError}</p>}{ordersLoading ? <p className="helper-note">Loading live orders…</p> : <OrderTable orders={orders} updateOrder={updateOrder}/>}</section>}
         {role === "distributor" && page === "Products & Stock" && <section className="panel product-admin-panel">
-          <div className="panel-head"><div><h2>Product catalogue</h2><p>Add products, set wholesale prices and manage available stock.</p></div><button className="btn btn-primary" type="button" onClick={startNewProduct}><Plus size={16}/> Add product</button></div>
+          <div className="panel-head"><div><h2>Product catalogue</h2><p>Add products, set wholesale prices and manage available stock.</p></div><div style={{ display:"flex", gap:8, flexWrap:"wrap", justifyContent:"flex-end" }}><a className="btn btn-outline" href="/catalogue-import"><Upload size={16}/> Import PDF</a><button className="btn btn-primary" type="button" onClick={startNewProduct}><Plus size={16}/> Add product</button></div></div>
           {productError && <p className="login-error product-admin-error" role="alert">{productError}</p>}
           {productFormOpen && <form className="product-form" onSubmit={saveProduct}>
             <div className="product-form-title"><strong>{editingProductId === null ? "Add a new product" : "Edit product"}</strong><span>Fields marked * are required.</span></div>
@@ -616,6 +620,7 @@ export default function Home() {
               <label>SKU / product code *<input value={productDraft.sku} onChange={e=>setProductDraft(v=>({...v,sku:e.target.value.toUpperCase()}))} placeholder="e.g. CDP-101" maxLength={60} required/></label>
               <label>Category *<input value={productDraft.category} onChange={e=>setProductDraft(v=>({...v,category:e.target.value}))} placeholder="e.g. Crockery" maxLength={80} required list="supplydesk-category-suggestions"/><datalist id="supplydesk-category-suggestions">{productCategories.filter(x=>x!=="All products").map(x=><option value={x} key={x}/>)}</datalist></label>
               <label>Brand<input value={productDraft.brand} onChange={e=>setProductDraft(v=>({...v,brand:e.target.value}))} placeholder="Brand name" maxLength={100}/></label>
+              <label>Size / capacity or details<input value={productDraft.description} onChange={e=>setProductDraft(v=>({...v,description:e.target.value}))} placeholder="e.g. 5 No · Master pack: 60 Pc" maxLength={300}/></label>
               <label>Selling unit *<select value={productDraft.unit} onChange={e=>setProductDraft(v=>({...v,unit:e.target.value}))}><option value="piece">Piece</option><option value="box">Box</option><option value="carton">Carton</option><option value="set">Set</option><option value="pack">Pack</option></select></label>
               <label>Pieces per unit *<input type="number" min="1" step="1" value={productDraft.piecesPerUnit} onChange={e=>setProductDraft(v=>({...v,piecesPerUnit:e.target.value}))} required/></label>
               <label>Minimum order quantity *<input type="number" min="1" step="1" value={productDraft.minimumOrderQuantity} onChange={e=>setProductDraft(v=>({...v,minimumOrderQuantity:e.target.value}))} required/></label>
@@ -631,7 +636,7 @@ export default function Home() {
           <div className="catalogue-toolbar"><div className="search-box"><Search size={17}/><input placeholder="Search products or SKU..." value={search} onChange={e=>setSearch(e.target.value)}/>{search && <button onClick={()=>setSearch("")} aria-label="Clear search"><X size={14}/></button>}</div>{role === "dealer" && <button className="btn btn-outline cart-toolbar" onClick={()=>setShowCart(true)}><ShoppingCart size={16}/> Cart ({cartCount})</button>}</div>
           <div className="category-row">{productCategories.map(c=><button key={c} className={category===c?"category-chip active":"category-chip"} onClick={()=>setCategory(c)}>{c}</button>)}</div>
           {productError && role === "dealer" && <div className="empty-state"><AlertTriangle size={26}/><h3>Could not load the catalogue</h3><p>{productError}</p></div>}
-          {productsLoading ? <div className="empty-state"><Package size={28}/><h3>Loading catalogue</h3><p>Checking products saved in your business account.</p></div> : <><div className="product-grid">{filtered.map(p=><article className="product-card" key={p.id}><div className={`product-visual ${p.color}`}><span className="product-category">{p.category}</span>{p.imagePath ? <img className="product-image" src={p.imagePath} alt={p.name} loading="lazy"/> : <div className="product-illustration">{p.mark}</div>}<span className={p.stock<20?"stock-label low":"stock-label"}>{p.stock<1?"Out of stock":p.stock<20?"Low stock":`${p.stock} ${p.unit}s in stock`}</span></div><div className="product-info"><div className="sku">{p.brand ? p.brand+" · " : ""}SKU {p.sku}</div><h3>{p.name}</h3><p>{p.piecesPerCarton} pieces per {p.unit} · Min. {p.minOrder}</p><div className="product-buy"><div><strong>{money(p.price)}</strong><small>per {p.unit.toLowerCase()}</small></div>{role === "dealer" ? <button className="add-btn" disabled={p.stock<p.minOrder} onClick={()=>{add(p,p.minOrder);flash(`${p.name} added to cart`);}}><Plus size={16}/> Add</button> : <button className="btn btn-outline product-edit-btn" type="button" onClick={()=>startEditProduct(p)}><Settings size={14}/> Edit</button>}</div>{role === "dealer" && cart.some(x=>x.product.id===p.id) && <div className="inline-quantity"><button onClick={()=>add(p,-1)} aria-label="Decrease quantity"><Minus size={13}/></button><span>{cart.find(x=>x.product.id===p.id)?.qty} in cart</span><button onClick={()=>add(p,1)} aria-label="Increase quantity"><Plus size={13}/></button></div>}</div></article>)}</div>{filtered.length===0&&<div className="empty-state"><Package size={30}/><h3>{productsLoading ? "Loading products" : search || category !== "All products" ? "No products found" : "No products yet"}</h3><p>{search || category !== "All products" ? "Try another search or category." : role === "distributor" ? "Select Add product above to publish your first item." : "Your distributor has not published products yet."}</p>{role === "distributor" && page === "Products & Stock" && <button className="btn btn-primary" onClick={startNewProduct}><Plus size={16}/> Add product</button>}</div>}</>}
+          {productsLoading ? <div className="empty-state"><Package size={28}/><h3>Loading catalogue</h3><p>Checking products saved in your business account.</p></div> : <><div className="product-grid">{filtered.map(p=><article className="product-card" key={p.id}><div className={`product-visual ${p.color}`}><span className="product-category">{p.category}</span>{p.imagePath ? <img className="product-image" src={p.imagePath} alt={p.name} loading="lazy"/> : <div className="product-illustration">{p.mark}</div>}<span className={p.stock<20?"stock-label low":"stock-label"}>{p.stock<1?"Out of stock":p.stock<20?"Low stock":`${p.stock} ${p.unit}s in stock`}</span></div><div className="product-info"><div className="sku">{p.brand ? p.brand+" · " : ""}SKU {p.sku}</div><h3>{p.name}</h3><p>{p.description || (p.piecesPerCarton + " pieces per " + p.unit + " · Min. " + p.minOrder)}</p><div className="product-buy"><div><strong>{money(p.price)}</strong><small>per {p.unit.toLowerCase()}</small></div>{role === "dealer" ? <button className="add-btn" disabled={p.stock<p.minOrder} onClick={()=>{add(p,p.minOrder);flash(`${p.name} added to cart`);}}><Plus size={16}/> Add</button> : <button className="btn btn-outline product-edit-btn" type="button" onClick={()=>startEditProduct(p)}><Settings size={14}/> Edit</button>}</div>{role === "dealer" && cart.some(x=>x.product.id===p.id) && <div className="inline-quantity"><button onClick={()=>add(p,-1)} aria-label="Decrease quantity"><Minus size={13}/></button><span>{cart.find(x=>x.product.id===p.id)?.qty} in cart</span><button onClick={()=>add(p,1)} aria-label="Increase quantity"><Plus size={13}/></button></div>}</div></article>)}</div>{filtered.length===0&&<div className="empty-state"><Package size={30}/><h3>{productsLoading ? "Loading products" : search || category !== "All products" ? "No products found" : "No products yet"}</h3><p>{search || category !== "All products" ? "Try another search or category." : role === "distributor" ? "Select Add product above to publish your first item." : "Your distributor has not published products yet."}</p>{role === "distributor" && page === "Products & Stock" && <button className="btn btn-primary" onClick={startNewProduct}><Plus size={16}/> Add product</button>}</div>}</>}
         </section>}
         {role === "distributor" && page === "Sales & Excel" && <section className="panel full-panel"><div className="panel-head"><div><h2>Delivered sales ledger</h2><p>Only delivered orders count as completed sales.</p></div><button className="btn btn-primary" onClick={csvExport}><FileSpreadsheet size={16}/> Export CSV for Excel</button></div><div className="sales-summary"><div><span>Completed sales value</span><strong>{money(orders.filter(o=>o.status==="Delivered").reduce((n,o)=>n+o.amount,0))}</strong></div><div><span>Delivered orders</span><strong>{orders.filter(o=>o.status==="Delivered").length}</strong></div><div><span>Pieces delivered</span><strong>{orders.filter(o=>o.status==="Delivered").reduce((n,o)=>n+o.pieces,0)}</strong></div></div><OrderTable orders={orders.filter(o=>o.status==="Delivered")} updateOrder={updateOrder}/></section>}
         {role === "distributor" && page === "Dealers" && <section className="panel full-panel"><div className="panel-head"><div><h2>Dealer accounts</h2><p>Review dealers linked to your distributor account.</p></div><span className="soft-count">{dealers.length} dealers</span></div>{dealersLoading ? <p className="helper-note">Loading dealer accounts…</p> : dealers.length === 0 ? <div className="empty-table">No dealers are linked to this distributor yet.</div> : dealers.map((d:any) => <div className="dealer-row" key={d.user_id}><div className="avatar">{String(d.store_name || "D").slice(0,2).toUpperCase()}</div><div className="dealer-details"><strong>{d.store_name || "Unnamed shop"}</strong><small>{[d.contact_name,d.address,d.city].filter(Boolean).join(" · ")}</small></div><span className={`status status-${String(d.review_status).replaceAll("_","-")}`}>{String(d.review_status).replaceAll("_"," ")}</span>{d.review_status === "pending" ? <div className="row-actions"><button className="accept-btn" onClick={()=>reviewDealer(d.user_id,"approved")} title="Approve dealer"><Check size={15}/></button><button className="reject-btn" onClick={()=>reviewDealer(d.user_id,"rejected")} title="Reject dealer"><X size={15}/></button></div> : <span className="table-time">—</span>}</div>)}</section>}
