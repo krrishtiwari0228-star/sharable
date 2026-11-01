@@ -107,6 +107,27 @@ describe("SupplyDesk tenant isolation (live Supabase)", () => {
     dealerB = await signIn("TEST_DEALER_B");
     distributorA = await signIn("TEST_DISTRIBUTOR_A");
     distributorB = await signIn("TEST_DISTRIBUTOR_B");
+
+    if (distributorA.distributorId === distributorB.distributorId) {
+      throw new Error("TEST_DISTRIBUTOR_A and TEST_DISTRIBUTOR_B must belong to different distributor tenants.");
+    }
+
+    const [{ data: dealerAProfile, error: dealerAError }, { data: dealerBProfile, error: dealerBError }] =
+      await Promise.all([
+        dealerA.client.from("dealer_profiles").select("distributor_id").eq("user_id", dealerA.user.id).single(),
+        dealerB.client.from("dealer_profiles").select("distributor_id").eq("user_id", dealerB.user.id).single(),
+      ]);
+
+    if (dealerAError || dealerBError || !dealerAProfile || !dealerBProfile) {
+      throw new Error("Both dealer test users must have dealer_profiles records.");
+    }
+    if (dealerAProfile.distributor_id !== distributorA.distributorId) {
+      throw new Error("TEST_DEALER_A must be assigned to TEST_DISTRIBUTOR_A.");
+    }
+    if (dealerBProfile.distributor_id !== distributorB.distributorId) {
+      throw new Error("TEST_DEALER_B must be assigned to TEST_DISTRIBUTOR_B.");
+    }
+
     anon = makeClient();
   }, 30_000);
 
