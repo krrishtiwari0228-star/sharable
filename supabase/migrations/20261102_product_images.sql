@@ -3,13 +3,11 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 values ('product-images', 'product-images', true, 8388608, array['image/jpeg'])
 on conflict (id) do nothing;
 
-drop policy if exists "product_images_public_read" on storage.objects;
 create policy "product_images_public_read"
 on storage.objects for select
 to public
 using (bucket_id = 'product-images');
 
-drop policy if exists "product_images_distributor_insert" on storage.objects;
 create policy "product_images_distributor_insert"
 on storage.objects for insert
 to authenticated
@@ -24,7 +22,6 @@ with check (
   )
 );
 
-drop policy if exists "product_images_distributor_update" on storage.objects;
 create policy "product_images_distributor_update"
 on storage.objects for update
 to authenticated
@@ -49,7 +46,6 @@ with check (
   )
 );
 
-drop policy if exists "product_images_distributor_delete" on storage.objects;
 create policy "product_images_distributor_delete"
 on storage.objects for delete
 to authenticated
