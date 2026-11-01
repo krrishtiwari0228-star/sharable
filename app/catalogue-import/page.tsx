@@ -343,8 +343,9 @@ export default function CatalogueImportPage() {
         const detected = candidateRows(lines, pageNumber, canvas.width, canvas.height, canvas);
         for (const photo of detected.photos) photos.set(photo.key, photo);
         allProducts = allProducts.concat(detected.products.map((product) => {
+          const categoryWasDetected = Boolean(product.category);
           const category = product.category || lastCategory;
-          const needsReview = product.needsReview || !category || !photos.get(product.imageKey)?.data;
+          const needsReview = product.needsReview || !category || !categoryWasDetected || !photos.get(product.imageKey)?.data;
           return {
             ...product,
             category,
