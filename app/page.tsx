@@ -155,7 +155,13 @@ export default function Home() {
   const cartCount = cart.reduce((n, line) => n + line.qty, 0);
   const cartTotal = cart.reduce((n, line) => n + line.qty * line.product.price, 0);
   const productCategories = useMemo(() => ["All products", ...Array.from(new Set(products.map(p => p.category).filter(Boolean))).sort((a,b)=>a.localeCompare(b))], [products]);
-  const filtered = useMemo(() => products.filter(p => (category === "All products" || p.category === category) && `${p.name} ${p.sku} ${p.category} ${p.brand}`.toLowerCase().includes(search.toLowerCase())), [products, category, search]);
+  const filtered = useMemo(() => {
+    const eligible = products.filter(p => category === "All products" || p.category === category);
+    const query = search.toLowerCase().trim();
+    if (!query) return eligible;
+    const matchingGroups = new Set(eligible.filter(p => `${p.name} ${p.sku} ${p.category} ${p.brand}`.toLowerCase().includes(query)).map(p => p.sku.match(/^(.+?)-(\\d{2,})$/)?.[1] || p.sku));
+    return eligible.filter(p => matchingGroups.has(p.sku.match(/^(.+?)-(\\d{2,})$/)?.[1] || p.sku));
+  }, [products, category, search]);
   const [selectedVariantByGroup, setSelectedVariantByGroup] = useState<Record<string, string>>({});
   const groupedFiltered = useMemo(() => {
     const groups = new Map<string, Product[]>();
