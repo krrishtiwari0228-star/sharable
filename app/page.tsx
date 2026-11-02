@@ -5,10 +5,40 @@ import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Bo
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 type Product = { id: string | number; name: string; category: string; brand: string; sku: string; unit: string; piecesPerCarton: number; minOrder: number; price: number; stock: number; color: string; mark: string; imagePath?: string; isActive?: boolean; reservedStock?: number };
-type ProductDraft = { name: string; sku: string; brand: string; category: string; unit: string; piecesPerUnit: string; minimumOrderQuantity: string; price: string; stock: string; imageUrl: string };
+type ProductDraft = { name: string; sku: string; brand: string; category: string; unit: string; piecesPerUnit: string; minimumOrderQuantity: string; price: string; stock: string; imageUrl: string; imageFile: File | null; imagePreview: string };
 type CartLine = { product: Product; qty: number };
 type WholesaleOrder = { id: string; orderNumber: string; dealer: string; area: string; items: number; pieces: number; products: string[]; cancelReason: string; amount: number; status: string; time: string };
 const money = (n: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
+const MAX_PRODUCT_IMAGE_BYTES = 8 * 1024 * 1024;
+
+async function encodeProductImage(file: File): Promise<Blob> {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    throw new Error("Choose a JPG, PNG or WebP image.");
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    throw new Error("Choose an image smaller than 20 MB.");
+  }
+
+  const bitmap = await createImageBitmap(file);
+  try {
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("This image could not be prepared for upload.");
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+    for (const quality of [0.86, 0.72, 0.58]) {
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      if (!blob) throw new Error("This image could not be prepared for upload.");
+      if (blob.size <= MAX_PRODUCT_IMAGE_BYTES) return blob;
+    }
+    throw new Error("This image is still too large after compression. Choose a smaller image.");
+  } finally {
+    bitmap.close();
+  }
+}
 
 export default function Home() {
   const [role, setRole] = useState<"distributor" | "dealer">("distributor");
@@ -37,8 +67,12 @@ export default function Home() {
   const [productFormOpen, setProductFormOpen] = useState(false);
   const [productSaving, setProductSaving] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | number | null>(null);
-  const emptyProductDraft: ProductDraft = { name: "", sku: "", brand: "", category: "", unit: "carton", piecesPerUnit: "1", minimumOrderQuantity: "1", price: "", stock: "0", imageUrl: "" };
+  const emptyProductDraft: ProductDraft = { name: "", sku: "", brand: "", category: "", unit: "carton", piecesPerUnit: "1", minimumOrderQuantity: "1", price: "", stock: "0", imageUrl: "", imageFile: null, imagePreview: "" };
   const [productDraft, setProductDraft] = useState<ProductDraft>(emptyProductDraft);
+  const productImageInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => () => {
+    if (productDraft.imagePreview.startsWith("blob:")) URL.revokeObjectURL(productDraft.imagePreview);
+  }, [productDraft.imagePreview]);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All products");
@@ -274,7 +308,9 @@ export default function Home() {
       minimumOrderQuantity: String(product.minOrder),
       price: String(product.price),
       stock: String(product.stock),
-      imageUrl: product.imagePath || ""
+      imageUrl: product.imagePath || "",
+      imageFile: null,
+      imagePreview: product.imagePath || ""
     });
     setProductError("");
     setProductFormOpen(true);
@@ -304,6 +340,7 @@ export default function Home() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) { setProductError("Supabase is not configured for this deployment."); return; }
     setProductSaving(true);
+    let uploadedImagePath: string | null = null;
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
@@ -325,13 +362,24 @@ export default function Home() {
         categoryId = newCategory.id;
       }
       const currentEditingProduct = editingProductId === null ? undefined : products.find(p => p.id === editingProductId);
+      let imagePath = productDraft.imageUrl.trim() || null;
+      if (productDraft.imageFile) {
+        const imageBlob = await encodeProductImage(productDraft.imageFile);
+        uploadedImagePath = distributor.id + "/products/" + crypto.randomUUID() + ".jpg";
+        const { error: imageUploadError } = await supabase.storage.from("product-images").upload(uploadedImagePath, imageBlob, {
+          contentType: "image/jpeg",
+          upsert: false
+        });
+        if (imageUploadError) throw new Error("Image upload failed: " + imageUploadError.message);
+        imagePath = supabase.storage.from("product-images").getPublicUrl(uploadedImagePath).data.publicUrl;
+      }
       const productPayload = {
         distributor_id: distributor.id,
         category_id: categoryId,
         sku,
         name,
         brand: brand || null,
-        image_path: productDraft.imageUrl.trim() || null,
+        image_path: imagePath,
         unit_label: unit,
         pieces_per_unit: piecesPerUnit,
         minimum_order_quantity: minimumOrderQuantity,
@@ -349,11 +397,12 @@ export default function Home() {
         if (error) throw error;
         savedId = saved.id;
       }
+      uploadedImagePath = null;
       const savedProduct: Product = {
         id: savedId, name, category: categoryName, brand, sku, unit,
         piecesPerCarton: piecesPerUnit, minOrder: minimumOrderQuantity,
         price, stock, color: "sage", mark: "◉",
-        imagePath: productDraft.imageUrl.trim(), isActive: true,
+        imagePath: imagePath || "", isActive: true,
         reservedStock: currentEditingProduct?.reservedStock || 0
       };
       setProducts(old => editingProductId === null ? [savedProduct, ...old] : old.map(p => p.id === editingProductId ? savedProduct : p));
@@ -363,6 +412,10 @@ export default function Home() {
       setEditingProductId(null);
       flash(editingProductId === null ? "Product saved to the live catalogue." : "Product changes saved.");
     } catch (error) {
+      if (uploadedImagePath) {
+        const { error: cleanupError } = await supabase.storage.from("product-images").remove([uploadedImagePath]);
+        if (cleanupError) console.warn("Could not clean up a failed product image upload", cleanupError.message);
+      }
       const message = error instanceof Error ? error.message : "Could not save the product.";
       setProductError(message.toLowerCase().includes("products_distributor_sku_key") || message.toLowerCase().includes("duplicate key")
         ? "That SKU already exists in your catalogue. Use a unique SKU for each product."
@@ -621,7 +674,19 @@ export default function Home() {
               <label>Minimum order quantity *<input type="number" min="1" step="1" value={productDraft.minimumOrderQuantity} onChange={e=>setProductDraft(v=>({...v,minimumOrderQuantity:e.target.value}))} required/></label>
               <label>Wholesale price per unit (₹) *<input type="number" min="0" step="0.01" value={productDraft.price} onChange={e=>setProductDraft(v=>({...v,price:e.target.value}))} placeholder="0.00" required/></label>
               <label>Available stock (units) *<input type="number" min="0" step="1" value={productDraft.stock} onChange={e=>setProductDraft(v=>({...v,stock:e.target.value}))} required/></label>
-              <label className="product-image-field">Product image URL<input type="url" value={productDraft.imageUrl} onChange={e=>setProductDraft(v=>({...v,imageUrl:e.target.value}))} placeholder="https://..." /></label>
+              <label className="product-image-field">Product image<input ref={productImageInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={event => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                setProductError("");
+                setProductDraft(value => ({ ...value, imageFile: file, imagePreview: URL.createObjectURL(file) }));
+              }} /><small>Choose a JPG, PNG or WebP image from your device.</small></label>
+              <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 12 }}>
+                {productDraft.imagePreview ? <img src={productDraft.imagePreview} alt="Product image preview" style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 8, border: "1px solid #dce5e2" }} /> : <span style={{ color: "#718286", fontSize: 13 }}>No image selected</span>}
+                {productDraft.imagePreview && <button className="btn btn-outline" type="button" disabled={productSaving} onClick={() => {
+                  if (productImageInputRef.current) productImageInputRef.current.value = "";
+                  setProductDraft(value => ({ ...value, imageUrl: "", imageFile: null, imagePreview: "" }));
+                }}>Remove image</button>}
+              </div>
             </div>
             <div className="product-form-actions"><button className="btn btn-primary" type="submit" disabled={productSaving}>{productSaving ? "Saving…" : editingProductId === null ? "Save product" : "Save changes"}</button><button className="btn btn-outline" type="button" disabled={productSaving} onClick={()=>{setProductFormOpen(false);setEditingProductId(null);setProductDraft(emptyProductDraft);setProductError("");}}>Cancel</button></div>
           </form>}
