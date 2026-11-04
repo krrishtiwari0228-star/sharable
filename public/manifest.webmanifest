@@ -1,0 +1,19 @@
+{
+  "name": "SupplyDesk",
+  "short_name": "SupplyDesk",
+  "description": "Wholesale dealer and distributor ordering",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f8faf7",
+  "theme_color": "#286748",
+  "icons": [
+    {
+      "src": "/supplydesk-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
