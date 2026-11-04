@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "SupplyDesk",
+    "slug": "supplydesk",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.supplydesk.mobile",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#102a43"
+      }
+    }
+  }
+}
