@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, CheckCircle2, AlertTriangle, Store as StoreIcon } from "lucide-react";
+import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, CheckCircle2, AlertTriangle, Sparkles, Store as StoreIcon } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 type Product = { id: string | number; name: string; category: string; brand: string; sku: string; unit: string; piecesPerCarton: number; minOrder: number; price: number; stock: number; color: string; mark: string; imagePath?: string; isActive?: boolean; reservedStock?: number };
@@ -48,6 +48,51 @@ async function encodeProductImage(file: File): Promise<Blob> {
   }
 }
 
+
+let backgroundRemovalRuntime: ReturnType<typeof loadBackgroundRemovalRuntime> | null = null;
+
+async function loadBackgroundRemovalRuntime() {
+  const { AutoModel, AutoProcessor, RawImage } = await import("@huggingface/transformers");
+  const browserNavigator = navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } };
+  const adapter = await browserNavigator.gpu?.requestAdapter();
+  if (!adapter) {
+    throw new Error("Background removal needs a recent Chrome, Edge, or another browser with WebGPU enabled.");
+  }
+
+  const modelId = "onnx-community/BiRefNet_lite-ONNX";
+  const model = await AutoModel.from_pretrained(modelId, { dtype: "fp16", device: "webgpu" });
+  const processor = await AutoProcessor.from_pretrained(modelId);
+  return { model, processor, RawImage };
+}
+
+async function removeProductImageBackground(source: Blob): Promise<Blob> {
+  const runtime = await (backgroundRemovalRuntime ??= loadBackgroundRemovalRuntime());
+  const image = await runtime.RawImage.fromBlob(source);
+  const { pixel_values } = await runtime.processor(image);
+  const { output_image } = await runtime.model({ input_image: pixel_values });
+  const mask = await runtime.RawImage.fromTensor(
+    output_image[0].sigmoid().mul(255).to("uint8"),
+  ).resize(image.width, image.height);
+  const cutout = image.clone().rgba().putAlpha(mask);
+  const canvas = document.createElement("canvas");
+  canvas.width = cutout.width;
+  canvas.height = cutout.height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("This background-removed image could not be prepared.");
+  context.putImageData(
+    new ImageData(new Uint8ClampedArray(cutout.data), cutout.width, cutout.height),
+    0,
+    0,
+  );
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => blob ? resolve(blob) : reject(new Error("This image could not be saved with transparency.")),
+      "image/webp",
+      0.94,
+    );
+  });
+}
+
 export default function Home() {
   const [role, setRole] = useState<"distributor" | "dealer">("distributor");
   const [signedIn, setSignedIn] = useState(false);
@@ -74,6 +119,7 @@ export default function Home() {
   const [catalogueRefreshKey, setCatalogueRefreshKey] = useState(0);
   const [productFormOpen, setProductFormOpen] = useState(false);
   const [productSaving, setProductSaving] = useState(false);
+  const [backgroundRemoving, setBackgroundRemoving] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | number | null>(null);
   const emptyProductDraft: ProductDraft = { name: "", sku: "", brand: "", category: "", unit: "carton", piecesPerUnit: "1", minimumOrderQuantity: "1", price: "", stock: "0", imageUrl: "", imageFile: null, imagePreview: "" };
   const [productDraft, setProductDraft] = useState<ProductDraft>(emptyProductDraft);
@@ -339,6 +385,34 @@ export default function Home() {
     setProductError("");
     setProductFormOpen(true);
   };
+  const handleRemoveProductBackground = async () => {
+    setProductError("");
+    setBackgroundRemoving(true);
+    try {
+      let sourceFile = productDraft.imageFile;
+      if (!sourceFile && productDraft.imageUrl) {
+        const response = await fetch(productDraft.imageUrl);
+        if (!response.ok) throw new Error("Could not open the saved product photo. Choose it from your device and try again.");
+        const sourceBlob = await response.blob();
+        const extension = sourceBlob.type === "image/png" ? "png" : sourceBlob.type === "image/webp" ? "webp" : "jpg";
+        sourceFile = new File([sourceBlob], `product-photo.${extension}`, { type: sourceBlob.type || "image/jpeg" });
+      }
+      if (!sourceFile) throw new Error("Choose a product photo first.");
+      const transparentBlob = await removeProductImageBackground(sourceFile);
+      const transparentFile = new File([transparentBlob], "product-cutout.webp", { type: transparentBlob.type || "image/webp" });
+      setProductDraft((current) => ({
+        ...current,
+        imageUrl: "",
+        imageFile: transparentFile,
+        imagePreview: URL.createObjectURL(transparentFile),
+      }));
+    } catch (error) {
+      setProductError(error instanceof Error ? error.message : "Could not remove this photo background.");
+    } finally {
+      setBackgroundRemoving(false);
+    }
+  };
+
   const saveProduct = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setProductError("");
@@ -704,7 +778,8 @@ export default function Home() {
                 if (!file) return;
                 setProductError("");
                 setProductDraft(value => ({ ...value, imageFile: file, imagePreview: URL.createObjectURL(file) }));
-              }} /><small>For a background-free photo, choose a transparent PNG or WebP.</small></label>
+              }} /><small>Select any product photo. Use Remove background to make it transparent.</small></label>
+              {(productDraft.imageFile || productDraft.imageUrl) && <div className="product-background-tool"><button className="btn btn-outline" type="button" disabled={productSaving || backgroundRemoving} onClick={handleRemoveProductBackground}><Sparkles size={15}/>{backgroundRemoving ? "Removing background…" : "Remove background"}</button><small>Runs in your browser. First use downloads a one-time model (about 115 MB).</small></div>
               <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 12 }}>
                 {productDraft.imagePreview ? <img src={productDraft.imagePreview} alt="Product image preview" style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 8, border: "1px solid #dce5e2" }} /> : <span style={{ color: "#718286", fontSize: 13 }}>No image selected</span>}
                 {productDraft.imagePreview && <button className="btn btn-outline" type="button" disabled={productSaving} onClick={() => {
