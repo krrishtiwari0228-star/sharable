@@ -74,15 +74,50 @@ async function removeProductImageBackground(source: Blob): Promise<Blob> {
     output_image[0].sigmoid().mul(255).to("uint8"),
   ).resize(image.width, image.height);
   const cutout = image.clone().rgba().putAlpha(mask);
-  const canvas = document.createElement("canvas");
-  canvas.width = cutout.width;
-  canvas.height = cutout.height;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("This background-removed image could not be prepared.");
-  context.putImageData(
+  const sourceCanvas = document.createElement("canvas");
+  sourceCanvas.width = cutout.width;
+  sourceCanvas.height = cutout.height;
+  const sourceContext = sourceCanvas.getContext("2d");
+  if (!sourceContext) throw new Error("This background-removed image could not be prepared.");
+  sourceContext.putImageData(
     new ImageData(new Uint8ClampedArray(cutout.data), cutout.width, cutout.height),
     0,
     0,
+  );
+  let minX = cutout.width;
+  let minY = cutout.height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < cutout.height; y++) {
+    for (let x = 0; x < cutout.width; x++) {
+      if (cutout.data[(y * cutout.width + x) * 4 + 3] <= 32) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+  if (maxX < minX || maxY < minY) throw new Error("No product was detected in this photo.");
+  const padding = Math.round(Math.max(maxX - minX + 1, maxY - minY + 1) * 0.06);
+  const cropX = Math.max(0, minX - padding);
+  const cropY = Math.max(0, minY - padding);
+  const cropRight = Math.min(cutout.width, maxX + padding + 1);
+  const cropBottom = Math.min(cutout.height, maxY + padding + 1);
+  const canvas = document.createElement("canvas");
+  canvas.width = cropRight - cropX;
+  canvas.height = cropBottom - cropY;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("This background-removed image could not be prepared.");
+  context.drawImage(
+    sourceCanvas,
+    cropX,
+    cropY,
+    canvas.width,
+    canvas.height,
+    0,
+    0,
+    canvas.width,
+    canvas.height,
   );
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
@@ -779,7 +814,7 @@ export default function Home() {
                 setProductError("");
                 setProductDraft(value => ({ ...value, imageFile: file, imagePreview: URL.createObjectURL(file) }));
               }} /><small>Select any product photo. Use Remove background to make it transparent.</small></label>
-              {(productDraft.imageFile || productDraft.imageUrl) && <div className="product-background-tool"><button className="btn btn-outline" type="button" disabled={productSaving || backgroundRemoving} onClick={handleRemoveProductBackground}><Sparkles size={15}/>{backgroundRemoving ? "Removing background…" : "Remove background"}</button><small>Runs in your browser. First use downloads a one-time model (about 115 MB).</small></div>}
+              {(productDraft.imageFile || productDraft.imageUrl) && <div className="product-background-tool"><button className="btn btn-outline" type="button" disabled={productSaving || backgroundRemoving} onClick={handleRemoveProductBackground}><Sparkles size={15}/>{backgroundRemoving ? "Removing background…" : "Remove background"}</button><small>Removes the background and trims empty edges. First use downloads a one-time model (about 115 MB).</small></div>}
               <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 12 }}>
                 {productDraft.imagePreview ? <img src={productDraft.imagePreview} alt="Product image preview" style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 8, border: "1px solid #dce5e2" }} /> : <span style={{ color: "#718286", fontSize: 13 }}>No image selected</span>}
                 {productDraft.imagePreview && <button className="btn btn-outline" type="button" disabled={productSaving} onClick={() => {
