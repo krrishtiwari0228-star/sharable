@@ -60,7 +60,7 @@ async function loadBackgroundRemovalRuntime() {
   }
 
   const modelId = "onnx-community/BiRefNet_lite-ONNX";
-  const model = await AutoModel.from_pretrained(modelId, { dtype: "fp16", device: "webgpu" });
+  const model = await AutoModel.from_pretrained(modelId, { dtype: "fp32", device: "webgpu" });
   const processor = await AutoProcessor.from_pretrained(modelId);
   return { model, processor, RawImage };
 }
