@@ -55,12 +55,18 @@ async function loadBackgroundRemovalRuntime() {
   const { AutoModel, AutoProcessor, RawImage } = await import("@huggingface/transformers");
   const browserNavigator = navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } };
   const adapter = await browserNavigator.gpu?.requestAdapter();
-  if (!adapter) {
-    throw new Error("Background removal needs a recent Chrome, Edge, or another browser with WebGPU enabled.");
-  }
-
   const modelId = "onnx-community/BiRefNet_lite-ONNX";
-  const model = await AutoModel.from_pretrained(modelId, { dtype: "fp32", device: "webgpu" });
+  let model;
+  if (adapter) {
+    try {
+      model = await AutoModel.from_pretrained(modelId, { dtype: "fp16", device: "webgpu" });
+    } catch (webGpuError) {
+      console.warn("Product photo model could not start on WebGPU; retrying on the CPU runtime.", webGpuError);
+    }
+  }
+  // Some integrated GPUs cannot allocate the model's large weight buffers. The
+  // same model runs on the CPU runtime, so background removal still works there.
+  model ??= await AutoModel.from_pretrained(modelId, { dtype: "fp32", device: "wasm" });
   const processor = await AutoProcessor.from_pretrained(modelId);
   return { model, processor, RawImage };
 }
@@ -822,7 +828,7 @@ export default function Home() {
                 setProductError("");
                 setProductDraft(value => ({ ...value, imageFile: file, imagePreview: URL.createObjectURL(file) }));
               }} /><small>Select any product photo. Use Remove background to make it transparent.</small></label>
-              {(productDraft.imageFile || productDraft.imageUrl) && <div className="product-background-tool"><button className="btn btn-outline" type="button" disabled={productSaving || backgroundRemoving} onClick={handleRemoveProductBackground}><Sparkles size={15}/>{backgroundRemoving ? "Removing background…" : "Remove background"}</button><small>Removes the background and trims empty edges. First use downloads a one-time model (about 115 MB).</small></div>}
+              {(productDraft.imageFile || productDraft.imageUrl) && <div className="product-background-tool"><button className="btn btn-outline" type="button" disabled={productSaving || backgroundRemoving} onClick={handleRemoveProductBackground}><Sparkles size={15}/>{backgroundRemoving ? "Removing background…" : "Remove background"}</button><small>Removes the background and trims empty edges. First use downloads a one-time model (up to about 225 MB).</small></div>}
               <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 12 }}>
                 {productDraft.imagePreview ? <img src={productDraft.imagePreview} alt="Product image preview" style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 8, border: "1px solid #dce5e2" }} /> : <span style={{ color: "#718286", fontSize: 13 }}>No image selected</span>}
                 {productDraft.imagePreview && <button className="btn btn-outline" type="button" disabled={productSaving} onClick={() => {
