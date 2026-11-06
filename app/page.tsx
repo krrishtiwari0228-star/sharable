@@ -51,15 +51,17 @@ async function encodeProductImage(file: File): Promise<Blob> {
 
 let backgroundRemovalRuntime: ReturnType<typeof loadBackgroundRemovalRuntime> | null = null;
 
-async function loadBackgroundRemovalRuntime() {
+async function loadBackgroundRemovalRuntime(preferWebGpu = true) {
   const { AutoModel, AutoProcessor, RawImage } = await import("@huggingface/transformers");
   const browserNavigator = navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } };
-  const adapter = await browserNavigator.gpu?.requestAdapter();
+  const adapter = preferWebGpu ? await browserNavigator.gpu?.requestAdapter() : null;
   const modelId = "onnx-community/BiRefNet_lite-ONNX";
   let model;
+  let device: "webgpu" | "wasm" = "wasm";
   if (adapter) {
     try {
       model = await AutoModel.from_pretrained(modelId, { dtype: "fp16", device: "webgpu" });
+      device = "webgpu";
     } catch (webGpuError) {
       console.warn("Product photo model could not start on WebGPU; retrying on the CPU runtime.", webGpuError);
     }
@@ -68,17 +70,35 @@ async function loadBackgroundRemovalRuntime() {
   // same model runs on the CPU runtime, so background removal still works there.
   model ??= await AutoModel.from_pretrained(modelId, { dtype: "fp32", device: "wasm" });
   const processor = await AutoProcessor.from_pretrained(modelId);
-  return { model, processor, RawImage };
+  return { model, processor, RawImage, device };
+}
+
+type BackgroundRemovalRuntime = Awaited<ReturnType<typeof loadBackgroundRemovalRuntime>>;
+
+async function inferProductMask(
+  image: Parameters<BackgroundRemovalRuntime["processor"]>[0],
+  runtime: BackgroundRemovalRuntime,
+) {
+  const { pixel_values } = await runtime.processor(image);
+  const { output_image } = await runtime.model({ input_image: pixel_values });
+  return runtime.RawImage.fromTensor(
+    output_image[0].sigmoid().mul(255).to("uint8"),
+  ).resize(image.width, image.height);
 }
 
 async function removeProductImageBackground(source: Blob): Promise<Blob> {
-  const runtime = await (backgroundRemovalRuntime ??= loadBackgroundRemovalRuntime());
+  let runtime = await (backgroundRemovalRuntime ??= loadBackgroundRemovalRuntime());
   const image = await runtime.RawImage.fromBlob(source);
-  const { pixel_values } = await runtime.processor(image);
-  const { output_image } = await runtime.model({ input_image: pixel_values });
-  const mask = await runtime.RawImage.fromTensor(
-    output_image[0].sigmoid().mul(255).to("uint8"),
-  ).resize(image.width, image.height);
+  let mask;
+  try {
+    mask = await inferProductMask(image, runtime);
+  } catch (webGpuError) {
+    if (runtime.device !== "webgpu") throw webGpuError;
+    console.warn("Product photo inference failed on WebGPU; retrying on the CPU runtime.", webGpuError);
+    backgroundRemovalRuntime = loadBackgroundRemovalRuntime(false);
+    runtime = await backgroundRemovalRuntime;
+    mask = await inferProductMask(image, runtime);
+  }
   const cutout = image.clone().rgba().putAlpha(mask);
   const sourceCanvas = document.createElement("canvas");
   sourceCanvas.width = cutout.width;
