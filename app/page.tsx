@@ -8,6 +8,13 @@ type Product = { id: string | number; name: string; category: string; brand: str
 type ProductDraft = { name: string; sku: string; brand: string; category: string; unit: string; piecesPerUnit: string; minimumOrderQuantity: string; price: string; stock: string; imageUrl: string; imageFile: File | null; imagePreview: string };
 type CartLine = { product: Product; qty: number };
 type WholesaleOrder = { id: string; orderNumber: string; dealer: string; area: string; items: number; pieces: number; products: string[]; cancelReason: string; amount: number; status: string; time: string };
+type DealerProfile = { user_id: string; store_name: string; contact_name: string; address: string; city: string; review_status: "pending" | "approved" | "rejected" | "suspended"; created_at: string };
+type CategoryRow = { id: string; name: string };
+type ProductRow = { id: string; category_id: string | null; sku: string; name: string; brand: string | null; image_path: string | null; unit_label: string; pieces_per_unit: number; minimum_order_quantity: number; price: number | string; stock_on_hand: number; stock_reserved: number; is_active: boolean };
+type OrderItemRow = { quantity: number; pieces_per_unit_snapshot: number; product_name_snapshot: string; unit_label_snapshot: string };
+type DealerOrderSummary = { store_name: string | null; city: string | null };
+type OrderRow = { id: string; order_number: number | string; dealer_profiles: DealerOrderSummary | DealerOrderSummary[] | null; order_items: OrderItemRow[] | null; status: string; delivery_address: string | null; cancellation_reason: string | null; grand_total: number | string | null; created_at: string };
+type OrdersPayload = { orders?: OrderRow[]; error?: string };
 const money = (n: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
 const MAX_PRODUCT_IMAGE_BYTES = 8 * 1024 * 1024;
 
@@ -80,7 +87,7 @@ export default function Home() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [orderError, setOrderError] = useState("");
   const [orderBusy, setOrderBusy] = useState(false);
-  const [dealers, setDealers] = useState<any[]>([]);
+  const [dealers, setDealers] = useState<DealerProfile[]>([]);
   const [dealersLoading, setDealersLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
@@ -197,7 +204,7 @@ export default function Home() {
       const { data, error } = await supabase.from("dealer_profiles").select("user_id,store_name,contact_name,address,city,review_status,created_at").order("created_at", { ascending: false });
       if (active) {
         if (error) flash(error.message);
-        else setDealers(data || []);
+        else setDealers((data || []) as DealerProfile[]);
         setDealersLoading(false);
       }
     };
@@ -234,21 +241,21 @@ export default function Home() {
           headers: { Authorization: `Bearer ${session.access_token}` },
           cache: "no-store"
         });
-        const payload = await response.json();
+        const payload = (await response.json()) as OrdersPayload;
         if (!response.ok) throw new Error(payload.error || "Could not load orders.");
         if (!active) return;
-        setOrders((payload.orders || []).map((o: any) => {
+        setOrders((payload.orders || []).map((o) => {
           const dealerValue = o.dealer_profiles;
-          const dealer: any = Array.isArray(dealerValue) ? dealerValue[0] : dealerValue;
-          const items: any[] = o.order_items || [];
+          const dealer = Array.isArray(dealerValue) ? dealerValue[0] : dealerValue;
+          const items = o.order_items || [];
           const status = String(o.status || "pending").replaceAll("_", " ").replace(/\b\w/g, (m: string) => m.toUpperCase());
           return {
             id: o.id, orderNumber: `ORD-${o.order_number}`,
             dealer: dealer?.store_name || "Dealer",
             area: [o.delivery_address, dealer?.city].filter(Boolean).join(", "),
             items: items.length,
-            pieces: items.reduce((sum: number, item: any) => sum + Number(item.quantity) * Number(item.pieces_per_unit_snapshot || 1), 0),
-            products: items.map((item: any) => `${item.product_name_snapshot} × ${item.quantity} ${item.unit_label_snapshot}`),
+            pieces: items.reduce((sum, item) => sum + Number(item.quantity) * Number(item.pieces_per_unit_snapshot || 1), 0),
+            products: items.map((item) => `${item.product_name_snapshot} × ${item.quantity} ${item.unit_label_snapshot}`),
             cancelReason: o.cancellation_reason || "", amount: Number(o.grand_total || 0), status,
             time: new Date(o.created_at).toLocaleString("en-IN")
           };
@@ -278,12 +285,12 @@ export default function Home() {
         if (categoryLoadError) throw categoryLoadError;
         if (productLoadError) throw productLoadError;
         if (!active) return;
-        const names = new Map((categoryRows || []).map((row: any) => [row.id, row.name]));
+        const names = new Map(((categoryRows || []) as CategoryRow[]).map((row) => [row.id, row.name]));
         const palette = ["sage", "blue", "coral", "sand", "mint", "plum", "gold", "orange"];
-        setProducts((productRows || []).map((row: any, index: number) => ({
+        setProducts(((productRows || []) as ProductRow[]).map((row, index) => ({
           id: row.id,
           name: row.name,
-          category: names.get(row.category_id) || "Uncategorised",
+          category: (row.category_id && names.get(row.category_id)) || "Uncategorised",
           brand: row.brand || "",
           sku: row.sku,
           unit: row.unit_label,
@@ -715,7 +722,7 @@ export default function Home() {
           {productsLoading ? <div className="empty-state"><Package size={28}/><h3>Loading catalogue</h3><p>Checking products saved in your business account.</p></div> : <><div className="product-grid">{groupedFiltered.map(({groupKey,variants})=>{const p=variants.find(v=>String(v.id)===selectedVariantByGroup[groupKey]) || variants[0];return <article className="product-card" key={groupKey}><div className={`product-visual ${p.color}`}><span className="product-category">{p.category}</span>{p.imagePath ? <img className="product-image" src={p.imagePath} alt={p.name} loading="lazy"/> : <div className="product-illustration">{p.mark}</div>}<span className={p.stock<20?"stock-label low":"stock-label"}>{p.stock<1?"Out of stock":p.stock<20?"Low stock":`${p.stock} ${p.unit}s in stock`}</span></div><div className="product-info"><div className="sku">{p.brand ? p.brand+" · " : ""}SKU {p.sku}</div><h3>{p.name.replace(/\s+\d+\s*L$/i,"")}</h3>{variants.length>1 && <label className="variant-picker-label">Size / Capacity<select className="variant-picker" value={String(p.id)} onChange={e=>setSelectedVariantByGroup(old=>({...old,[groupKey]:e.target.value}))}>{variants.map(v=><option key={v.id} value={String(v.id)}>{v.name.match(/\d+\s*L$/i)?.[0] || v.sku} · {money(v.price)} · {v.stock} in stock</option>)}</select></label>}<p>{p.piecesPerCarton} {p.unit === "piece" ? "piece" : "pieces"} per {p.unit} · Min. {p.minOrder}</p><div className="product-buy"><div><strong>{money(p.price)}</strong><small>per {p.unit.toLowerCase()}</small></div>{role === "dealer" ? <button className="add-btn" disabled={p.stock<p.minOrder} onClick={()=>{add(p,p.minOrder);flash(`${p.name} added to cart`);}}><Plus size={16}/> Add</button> : <button className="btn btn-outline product-edit-btn" type="button" onClick={()=>startEditProduct(p)}><Settings size={14}/> Edit</button>}</div>{role === "dealer" && cart.some(x=>x.product.id===p.id) && <div className="inline-quantity"><button onClick={()=>add(p,-1)} aria-label="Decrease quantity"><Minus size={13}/></button><span>{cart.find(x=>x.product.id===p.id)?.qty} in cart</span><button onClick={()=>add(p,1)} aria-label="Increase quantity"><Plus size={13}/></button></div>}</div></article>})}</div>{filtered.length===0&&<div className="empty-state"><Package size={30}/><h3>{productsLoading ? "Loading products" : search || category !== "All products" ? "No products found" : "No products yet"}</h3><p>{search || category !== "All products" ? "Try another search or category." : role === "distributor" ? "Select Add product above to publish your first item." : "Your distributor has not published products yet."}</p>{role === "distributor" && page === "Products & Stock" && <button className="btn btn-primary" onClick={startNewProduct}><Plus size={16}/> Add product</button>}</div>}</>}
         </section>}
         {role === "distributor" && page === "Sales & Excel" && <section className="panel full-panel"><div className="panel-head"><div><h2>Delivered sales ledger</h2><p>Only delivered orders count as completed sales.</p></div><button className="btn btn-primary" onClick={csvExport}><FileSpreadsheet size={16}/> Export CSV for Excel</button></div><div className="sales-summary"><div><span>Completed sales value</span><strong>{money(orders.filter(o=>o.status==="Delivered").reduce((n,o)=>n+o.amount,0))}</strong></div><div><span>Delivered orders</span><strong>{orders.filter(o=>o.status==="Delivered").length}</strong></div><div><span>Pieces delivered</span><strong>{orders.filter(o=>o.status==="Delivered").reduce((n,o)=>n+o.pieces,0)}</strong></div></div><OrderTable orders={orders.filter(o=>o.status==="Delivered")} updateOrder={updateOrder}/></section>}
-        {role === "distributor" && page === "Dealers" && <section className="panel full-panel"><div className="panel-head"><div><h2>Dealer accounts</h2><p>Review dealers linked to your distributor account.</p></div><span className="soft-count">{dealers.length} dealers</span></div>{dealersLoading ? <p className="helper-note">Loading dealer accounts…</p> : dealers.length === 0 ? <div className="empty-table">No dealers are linked to this distributor yet.</div> : dealers.map((d:any) => <div className="dealer-row" key={d.user_id}><div className="avatar">{String(d.store_name || "D").slice(0,2).toUpperCase()}</div><div className="dealer-details"><strong>{d.store_name || "Unnamed shop"}</strong><small>{[d.contact_name,d.address,d.city].filter(Boolean).join(" · ")}</small></div><span className={`status status-${String(d.review_status).replaceAll("_","-")}`}>{String(d.review_status).replaceAll("_"," ")}</span>{d.review_status === "pending" ? <div className="row-actions"><button className="accept-btn" onClick={()=>reviewDealer(d.user_id,"approved")} title="Approve dealer"><Check size={15}/></button><button className="reject-btn" onClick={()=>reviewDealer(d.user_id,"rejected")} title="Reject dealer"><X size={15}/></button></div> : <span className="table-time">—</span>}</div>)}</section>}
+        {role === "distributor" && page === "Dealers" && <section className="panel full-panel"><div className="panel-head"><div><h2>Dealer accounts</h2><p>Review dealers linked to your distributor account.</p></div><span className="soft-count">{dealers.length} dealers</span></div>{dealersLoading ? <p className="helper-note">Loading dealer accounts…</p> : dealers.length === 0 ? <div className="empty-table">No dealers are linked to this distributor yet.</div> : dealers.map((d) => <div className="dealer-row" key={d.user_id}><div className="avatar">{String(d.store_name || "D").slice(0,2).toUpperCase()}</div><div className="dealer-details"><strong>{d.store_name || "Unnamed shop"}</strong><small>{[d.contact_name,d.address,d.city].filter(Boolean).join(" · ")}</small></div><span className={`status status-${String(d.review_status).replaceAll("_","-")}`}>{String(d.review_status).replaceAll("_"," ")}</span>{d.review_status === "pending" ? <div className="row-actions"><button className="accept-btn" onClick={()=>reviewDealer(d.user_id,"approved")} title="Approve dealer"><Check size={15}/></button><button className="reject-btn" onClick={()=>reviewDealer(d.user_id,"rejected")} title="Reject dealer"><X size={15}/></button></div> : <span className="table-time">—</span>}</div>)}</section>}
         {role === "dealer" && page === "My Orders" && <section className="panel full-panel"><div className="panel-head"><div><h2>Your orders</h2><p>Follow each order from placement to delivery.</p></div></div>{orderError && <p className="login-error">{orderError}</p>}{ordersLoading ? <p className="helper-note">Loading your orders…</p> : <OrderTable orders={orders} updateOrder={updateOrder} dealerMode/>}</section>}
         {role === "distributor" && page === "Settings" && <section className="panel account-panel"><div className="panel-head"><div><h2>Account settings</h2><p>Administrator access and workspace information.</p></div></div><div className="account-setting-row"><span>Workspace</span><strong>Distributor Admin</strong></div><div className="account-setting-row"><span>Authentication</span><strong>Supabase account</strong></div><p className="login-note">Your administrator login is separate from dealer accounts. Business and catalogue setup is managed through the configured distributor record.</p><button className="btn btn-outline account-signout" onClick={async () => { const supabase=getSupabaseBrowserClient(); if(supabase) await supabase.auth.signOut(); setSignedIn(false); setLoginPassword(""); setLoginError(""); }}>Sign out</button></section>}
         {role === "dealer" && page === "My Account" && <section className="panel account-panel"><div className="panel-head"><div><h2>Shop profile</h2><p>Details used for order and delivery updates.</p></div></div><label className="form-label">Shop / store name<input value={dealerName} onChange={e=>setDealerName(e.target.value)} /></label><label className="form-label">Contact name<input defaultValue="Shop Owner" /></label><label className="form-label">Mobile number<input placeholder="Enter mobile number" /></label><label className="form-label">Delivery address<textarea placeholder="Shop address, area, city and PIN code" rows={3}/></label><button className="btn btn-primary" onClick={()=>flash("Profile editing is temporarily disabled until the database profile editor is ready.")}>Save profile</button></section>}
