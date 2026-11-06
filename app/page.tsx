@@ -423,6 +423,7 @@ export default function Home() {
   const handleRemoveProductBackground = async () => {
     setProductError("");
     setBackgroundRemoving(true);
+    let processingStage = "opening the saved product photo";
     try {
       let sourceFile = productDraft.imageFile;
       if (!sourceFile && productDraft.imageUrl) {
@@ -433,6 +434,7 @@ export default function Home() {
         sourceFile = new File([sourceBlob], `product-photo.${extension}`, { type: sourceBlob.type || "image/jpeg" });
       }
       if (!sourceFile) throw new Error("Choose a product photo first.");
+      processingStage = "loading the background removal model";
       const transparentBlob = await removeProductImageBackground(sourceFile);
       const transparentFile = new File([transparentBlob], "product-cutout.webp", { type: transparentBlob.type || "image/webp" });
       setProductDraft((current) => ({
@@ -442,7 +444,13 @@ export default function Home() {
         imagePreview: URL.createObjectURL(transparentFile),
       }));
     } catch (error) {
-      setProductError(error instanceof Error ? error.message : "Could not remove this photo background.");
+      const message = error instanceof Error
+        ? error.message
+        : error && typeof error === "object" && "message" in error
+          ? String(error.message)
+          : String(error || "Unknown error");
+      console.error(`Product background removal failed while ${processingStage}.`, error);
+      setProductError(`${processingStage}: ${message}`);
     } finally {
       setBackgroundRemoving(false);
     }
