@@ -78,7 +78,7 @@
 
 /* Product cards: give catalog photos more room and reduce surrounding whitespace. */
 .product-visual{height:220px}
-.product-visual .product-image{max-height:none;padding:6px 8px 10px;mix-blend-mode:multiply}
+.product-visual .product-image{max-height:none;padding:6px 8px 10px}
 .product-info{padding:11px 12px 10px}
 .product-info h3{margin:5px 0 3px}
 .product-buy{margin-top:10px;padding-top:8px}
@@ -93,16 +93,3 @@
   .product-buy{margin-top:8px;padding-top:7px}
 }
 
-/* Extend each product photo's own colors into the side gaps without cropping it. */
-.product-image-backdrop{
-  position:absolute;
-  inset:-14px;
-  z-index:0;
-  background-position:center;
-  background-size:cover;
-  filter:blur(18px) saturate(.8);
-  opacity:.34;
-  transform:scale(1.06);
-  pointer-events:none;
-}
-.product-visual .product-image{z-index:0}
