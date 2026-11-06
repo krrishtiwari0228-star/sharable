@@ -779,7 +779,7 @@ export default function Home() {
                 setProductError("");
                 setProductDraft(value => ({ ...value, imageFile: file, imagePreview: URL.createObjectURL(file) }));
               }} /><small>Select any product photo. Use Remove background to make it transparent.</small></label>
-              {(productDraft.imageFile || productDraft.imageUrl) && <div className="product-background-tool"><button className="btn btn-outline" type="button" disabled={productSaving || backgroundRemoving} onClick={handleRemoveProductBackground}><Sparkles size={15}/>{backgroundRemoving ? "Removing background…" : "Remove background"}</button><small>Runs in your browser. First use downloads a one-time model (about 115 MB).</small></div>
+              {(productDraft.imageFile || productDraft.imageUrl) && <div className="product-background-tool"><button className="btn btn-outline" type="button" disabled={productSaving || backgroundRemoving} onClick={handleRemoveProductBackground}><Sparkles size={15}/>{backgroundRemoving ? "Removing background…" : "Remove background"}</button><small>Runs in your browser. First use downloads a one-time model (about 115 MB).</small></div>}
               <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 12 }}>
                 {productDraft.imagePreview ? <img src={productDraft.imagePreview} alt="Product image preview" style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 8, border: "1px solid #dce5e2" }} /> : <span style={{ color: "#718286", fontSize: 13 }}>No image selected</span>}
                 {productDraft.imagePreview && <button className="btn btn-outline" type="button" disabled={productSaving} onClick={() => {
