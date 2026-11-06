@@ -426,7 +426,7 @@ export default function Home() {
     try {
       let sourceFile = productDraft.imageFile;
       if (!sourceFile && productDraft.imageUrl) {
-        const response = await fetch(productDraft.imageUrl);
+        const response = await fetch(`/api/product-image?url=${encodeURIComponent(productDraft.imageUrl)}`);
         if (!response.ok) throw new Error("Could not open the saved product photo. Choose it from your device and try again.");
         const sourceBlob = await response.blob();
         const extension = sourceBlob.type === "image/png" ? "png" : sourceBlob.type === "image/webp" ? "webp" : "jpg";
