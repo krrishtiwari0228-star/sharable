@@ -82,3 +82,50 @@
 
 
 .product-visual .product-image{position:absolute;inset:0;width:100%;height:100%;max-height:none;object-fit:contain;object-position:center;padding:8px}
+
+
+/* SupplyDesk professional business palette: navy, teal, cool neutral surfaces. */
+:root{--ink:#172b3a;--muted:#647789;--line:#dce5eb;--paper:#f3f7fa;--green:#176b78;--green-dark:#124e5b;--green-soft:#e3f1f3;--orange:#b87927;--red:#b74747;--shadow:0 8px 26px rgba(23,43,58,.055)}
+.sidebar{background:#fff;border-right-color:#dce5eb}
+.brand-mark,.top-avatar{background:linear-gradient(145deg,#1b7180,#145563);color:#fff}
+.nav-item:hover{background:#edf5f7;color:#176b78}
+.nav-item.selected{background:#e3f1f3;color:#155d69;box-shadow:inset 3px 0 #176b78}
+.nav-count{background:#d9edf0;color:#176b78}
+.role-switch button.active{color:#176b78}
+.page-heading h1 em{color:#176b78}
+.btn-primary,.login-submit{background:#176b78;border-color:#176b78;color:#fff}
+.btn-primary:hover,.login-submit:hover{background:#124e5b;border-color:#124e5b}
+.btn-outline:hover,.icon-btn:hover{border-color:#a9cbd0;color:#176b78}
+.metric-icon.green,.quick-icon,.empty-cart-icon{background:#e3f1f3;color:#176b78}
+.metric-icon.orange{background:#fff3e3;color:#b87927}
+.metric-icon.purple{background:#edf0f8;color:#6476a5}
+.metric-icon.red{background:#faeaea;color:#b74747}
+.feature-banner{background:linear-gradient(110deg,#e7f2f5,#f0f6f8);border-color:#dcebef}
+.banner-symbol,.art-box{background:#d8ebef;border-color:#c4e0e5;color:#176b78}
+.art-ring{border-color:#cfe3e8}
+.art-chip{border-color:#dce9ed;color:#567582}
+.live-tag{background:#eef7f8;border-color:#dcebef;color:#176b78}
+.live-tag span,.status-pill span{background:#2c9a9a;box-shadow:0 0 0 3px #e0f2f2}
+.status-accepted,.status-delivered{background:#e3f1f3;color:#176b78}
+.accept-btn,.deliver-btn{border-color:#cfe4e7;background:#edf7f8;color:#176b78}
+.accept-btn:hover{background:#dceff1}
+.stock-progress span{background:#278a91}
+.green-dot{background:#278a91}
+.category-chip.active,.workspace-tabs button.active{background:#e3f1f3;border-color:#cfe4e7;color:#176b78}
+.add-btn{border-color:#cfe4e7;background:#edf7f8;color:#176b78}
+.add-btn:hover{background:#dceff1}
+.inline-quantity{border-color:#d4e8ea;background:#f0f8f9;color:#176b78}
+.inline-quantity button{color:#176b78}
+.login-kicker{color:#176b78}
+.login-role-tabs button.chosen{border-color:#176b78;background:#edf7f8;color:#155d69;box-shadow:inset 0 0 0 1px #176b78}
+.login-form input:focus,.product-form-grid input:focus,.product-form-grid select:focus{border-color:#278a91;box-shadow:0 0 0 3px #e3f1f3}
+.login-reset{color:#176b78}
+.signed-in-dot{background:#278a91}
+.account-menu button:hover{background:#edf5f7}
+.account-menu .account-menu-signout{color:#b74747}
+.search-box:focus-within{border-color:#8bbfc6;box-shadow:0 0 0 3px #e3f1f3}
+.product-card:hover{border-color:#c4dce1}
+.checkout-note{background:#eaf5f5;color:#176b78}
+.toast{background:#173b48}
+.toast>svg{color:#b9e4e5}
+@media(max-width:700px){.nav-item.selected{box-shadow:inset 3px 0 #176b78}}
