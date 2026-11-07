@@ -78,4 +78,4 @@
 
 /* Let portrait product photos use a square card frame without cropping. */
 .product-visual{height:auto;aspect-ratio:1/1}
-.product-visual .product-image{max-height:none;padding:12px}
+.product-visual .product-image{max-height:none;padding:0}
