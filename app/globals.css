@@ -31,16 +31,16 @@
 
 /* SupplyDesk visual refresh — presentation only; workspace markup and behavior remain unchanged. */
 :root{
-  --ink:#1e2b22;
-  --muted:#778278;
-  --line:#e4e9e2;
-  --paper:#f6f8f4;
-  --green:#255f40;
-  --green-dark:#194a31;
-  --green-soft:#e7f1e8;
-  --orange:#a86e29;
-  --red:#b55248;
-  --shadow:0 9px 30px rgba(25,48,31,.055)
+  --ink:#18271e;
+  --muted:#66756a;
+  --line:#dfe7df;
+  --paper:#f5f8f3;
+  --green:#1f6a45;
+  --green-dark:#174c31;
+  --green-soft:#e4f1e7;
+  --orange:#9b5b1c;
+  --red:#b33d35;
+  --shadow:0 9px 30px rgba(24,39,30,.06)
 }
 .sidebar{background:#fcfdfb;border-right-color:#e2e8e0}
 .brand-mark{background:linear-gradient(145deg,#2d744c,#205738);box-shadow:0 4px 10px rgba(37,95,64,.16)}
@@ -81,4 +81,4 @@
 .product-visual .product-image{max-height:none;padding:0}
 
 
-.product-visual .product-image{position:absolute;inset:0;width:100%;height:100%;max-height:none;object-fit:cover;object-position:center;padding:0}
+.product-visual .product-image{position:absolute;inset:0;width:100%;height:100%;max-height:none;object-fit:contain;object-position:center;padding:8px}
