@@ -4,13 +4,13 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, CheckCircle2, AlertTriangle, Sparkles, Store as StoreIcon } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
-type Product = { id: string | number; name: string; category: string; brand: string; sku: string; unit: string; piecesPerCarton: number; minOrder: number; price: number; stock: number; color: string; mark: string; imagePath?: string; isActive?: boolean; reservedStock?: number };
-type ProductDraft = { name: string; sku: string; brand: string; category: string; unit: string; piecesPerUnit: string; minimumOrderQuantity: string; price: string; stock: string; imageUrl: string; imageFile: File | null; imagePreview: string };
+type Product = { id: string | number; name: string; category: string; brand: string; sku: string; unit: string; piecesPerCarton: number; minOrder: number; price: number; stock: number; color: string; mark: string; imagePath?: string; imagePaths?: string[]; productType?: string; colorName?: string; capacityLiters?: number | null; isActive?: boolean; reservedStock?: number };
+type ProductDraft = { name: string; sku: string; brand: string; category: string; unit: string; piecesPerUnit: string; minimumOrderQuantity: string; price: string; stock: string; imageUrl: string; imageFile: File | null; imagePreview: string; imageFiles: File[]; imagePreviews: string[]; productType: "color" | "non_color"; colorName: string; capacityLiters: string };
 type CartLine = { product: Product; qty: number };
 type WholesaleOrder = { id: string; orderNumber: string; dealer: string; area: string; items: number; pieces: number; products: string[]; cancelReason: string; amount: number; status: string; time: string };
 type DealerProfile = { user_id: string; store_name: string; contact_name: string; address: string; city: string; review_status: "pending" | "approved" | "rejected" | "suspended"; created_at: string };
 type CategoryRow = { id: string; name: string };
-type ProductRow = { id: string; category_id: string | null; sku: string; name: string; brand: string | null; image_path: string | null; unit_label: string; pieces_per_unit: number; minimum_order_quantity: number; price: number | string; stock_on_hand: number; stock_reserved: number; is_active: boolean };
+type ProductRow = { id: string; category_id: string | null; sku: string; name: string; brand: string | null; image_path: string | null; image_paths: string[] | null; product_type: string; color_name: string | null; capacity_liters: number | null; unit_label: string; pieces_per_unit: number; minimum_order_quantity: number; price: number | string; stock_on_hand: number; stock_reserved: number; is_active: boolean };
 type OrderItemRow = { quantity: number; pieces_per_unit_snapshot: number; product_name_snapshot: string; unit_label_snapshot: string };
 type DealerOrderSummary = { store_name: string | null; city: string | null };
 type OrderRow = { id: string; order_number: number | string; dealer_profiles: DealerOrderSummary | DealerOrderSummary[] | null; order_items: OrderItemRow[] | null; status: string; delivery_address: string | null; cancellation_reason: string | null; grand_total: number | string | null; created_at: string };
@@ -220,7 +220,7 @@ export default function Home() {
   const [productSaving, setProductSaving] = useState(false);
   const [backgroundRemoving, setBackgroundRemoving] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | number | null>(null);
-  const emptyProductDraft: ProductDraft = { name: "", sku: "", brand: "", category: "", unit: "carton", piecesPerUnit: "1", minimumOrderQuantity: "1", price: "", stock: "0", imageUrl: "", imageFile: null, imagePreview: "" };
+  const emptyProductDraft: ProductDraft = { name: "", sku: "", brand: "", category: "", unit: "carton", piecesPerUnit: "1", minimumOrderQuantity: "1", price: "", stock: "0", imageUrl: "", imageFile: null, imagePreview: "", imageFiles: [], imagePreviews: [], productType: "non_color", colorName: "", capacityLiters: "" };
   const [productDraft, setProductDraft] = useState<ProductDraft>(emptyProductDraft);
   const productImageInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => () => {
@@ -316,6 +316,7 @@ export default function Home() {
     return eligible.filter(p => matchingGroups.has(p.sku.match(/^(.+?)-(\\d{2,})$/)?.[1] || p.sku));
   }, [products, category, search]);
   const [selectedVariantByGroup, setSelectedVariantByGroup] = useState<Record<string, string>>({});
+  const [selectedPhotoByProduct, setSelectedPhotoByProduct] = useState<Record<string, number>>({});
   const groupedFiltered = useMemo(() => {
     const groups = new Map<string, Product[]>();
     for (const product of filtered) {
@@ -426,7 +427,7 @@ export default function Home() {
       try {
         const [{ data: categoryRows, error: categoryLoadError }, { data: productRows, error: productLoadError }] = await Promise.all([
           supabase.from("categories").select("id,name"),
-          supabase.from("products").select("id,category_id,sku,name,brand,description,image_path,unit_label,pieces_per_unit,minimum_order_quantity,price,stock_on_hand,stock_reserved,is_active").eq("is_active", true)
+          supabase.from("products").select("id,category_id,sku,name,brand,description,image_path,image_paths,product_type,color_name,capacity_liters,unit_label,pieces_per_unit,minimum_order_quantity,price,stock_on_hand,stock_reserved,is_active").eq("is_active", true)
         ]);
         if (categoryLoadError) throw categoryLoadError;
         if (productLoadError) throw productLoadError;
@@ -447,7 +448,7 @@ export default function Home() {
           reservedStock: Number(row.stock_reserved || 0),
           color: palette[index % palette.length],
           mark: "◉",
-          imagePath: row.image_path || "",
+          imagePath: row.image_path || "", imagePaths: row.image_paths?.length ? row.image_paths : row.image_path ? [row.image_path] : [], productType: row.product_type || "non_color", colorName: row.color_name || "", capacityLiters: row.capacity_liters,
           isActive: row.is_active
         })));
       } catch (error) {
@@ -479,7 +480,7 @@ export default function Home() {
       stock: String(product.stock),
       imageUrl: product.imagePath || "",
       imageFile: null,
-      imagePreview: product.imagePath || ""
+      imagePreview: product.imagePath || "", imageFiles: [], imagePreviews: product.imagePaths?.length ? product.imagePaths : product.imagePath ? [product.imagePath] : [], productType: product.productType === "color" ? "color" : "non_color", colorName: product.colorName || "", capacityLiters: product.capacityLiters == null ? "" : String(product.capacityLiters)
     });
     setProductError("");
     setProductFormOpen(true);
@@ -538,6 +539,8 @@ export default function Home() {
     const stock = Number(productDraft.stock);
     if (!name || !sku || !categoryName) { setProductError("Enter product name, SKU and category."); return; }
     if (!["piece", "box", "carton", "set", "pack"].includes(unit)) { setProductError("Choose a valid selling unit."); return; }
+    if (productDraft.productType === "color" && !productDraft.colorName.trim()) { setProductError("Enter a color name for this color variant."); return; }
+    if (productDraft.capacityLiters.trim() && (!Number.isFinite(Number(productDraft.capacityLiters)) || Number(productDraft.capacityLiters) <= 0)) { setProductError("Enter a valid capacity in liters."); return; }
     if (!Number.isInteger(piecesPerUnit) || piecesPerUnit < 1 || !Number.isInteger(minimumOrderQuantity) || minimumOrderQuantity < 1 || !Number.isInteger(stock) || stock < 0 || !Number.isFinite(price) || price < 0) {
       setProductError("Check price, stock, pack size and minimum order values.");
       return;
@@ -545,7 +548,7 @@ export default function Home() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) { setProductError("Supabase is not configured for this deployment."); return; }
     setProductSaving(true);
-    let uploadedImagePath: string | null = null;
+    const uploadedImagePaths: string[] = [];
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
@@ -567,18 +570,18 @@ export default function Home() {
         categoryId = newCategory.id;
       }
       const currentEditingProduct = editingProductId === null ? undefined : products.find(p => p.id === editingProductId);
-      let imagePath = productDraft.imageUrl.trim() || null;
-      if (productDraft.imageFile) {
-        const imageBlob = await encodeProductImage(productDraft.imageFile);
+      let imagePaths = productDraft.imagePreviews.filter(path => !path.startsWith("blob:"));
+      const filesToUpload = productDraft.imageFiles.length ? productDraft.imageFiles : productDraft.imageFile ? [productDraft.imageFile] : [];
+      for (const file of filesToUpload) {
+        const imageBlob = await encodeProductImage(file);
         const imageExtension = imageBlob.type === "image/png" ? "png" : imageBlob.type === "image/webp" ? "webp" : "jpg";
-        uploadedImagePath = distributor.id + "/products/" + crypto.randomUUID() + "." + imageExtension;
-        const { error: imageUploadError } = await supabase.storage.from("product-images").upload(uploadedImagePath, imageBlob, {
-          contentType: imageBlob.type,
-          upsert: false
-        });
+        const uploadedPath = distributor.id + "/products/" + crypto.randomUUID() + "." + imageExtension;
+        const { error: imageUploadError } = await supabase.storage.from("product-images").upload(uploadedPath, imageBlob, { contentType: imageBlob.type, upsert: false });
         if (imageUploadError) throw new Error("Image upload failed: " + imageUploadError.message);
-        imagePath = supabase.storage.from("product-images").getPublicUrl(uploadedImagePath).data.publicUrl;
+        uploadedImagePaths.push(uploadedPath);
+        imagePaths.push(supabase.storage.from("product-images").getPublicUrl(uploadedPath).data.publicUrl);
       }
+      const imagePath = imagePaths[0] || productDraft.imageUrl.trim() || null;
       const productPayload = {
         distributor_id: distributor.id,
         category_id: categoryId,
@@ -586,6 +589,10 @@ export default function Home() {
         name,
         brand: brand || null,
         image_path: imagePath,
+        image_paths: imagePaths,
+        product_type: productDraft.productType,
+        color_name: productDraft.productType === "color" ? productDraft.colorName.trim() || null : null,
+        capacity_liters: productDraft.capacityLiters.trim() ? Number(productDraft.capacityLiters) : null,
         unit_label: unit,
         pieces_per_unit: piecesPerUnit,
         minimum_order_quantity: minimumOrderQuantity,
@@ -603,12 +610,12 @@ export default function Home() {
         if (error) throw error;
         savedId = saved.id;
       }
-      uploadedImagePath = null;
+      uploadedImagePaths.length = 0;
       const savedProduct: Product = {
         id: savedId, name, category: categoryName, brand, sku, unit,
         piecesPerCarton: piecesPerUnit, minOrder: minimumOrderQuantity,
         price, stock, color: "sage", mark: "◉",
-        imagePath: imagePath || "", isActive: true,
+        imagePath: imagePath || "", imagePaths, productType: productDraft.productType, colorName: productDraft.colorName.trim(), capacityLiters: productDraft.capacityLiters.trim() ? Number(productDraft.capacityLiters) : null, isActive: true,
         reservedStock: currentEditingProduct?.reservedStock || 0
       };
       setProducts(old => editingProductId === null ? [savedProduct, ...old] : old.map(p => p.id === editingProductId ? savedProduct : p));
@@ -618,9 +625,9 @@ export default function Home() {
       setEditingProductId(null);
       flash(editingProductId === null ? "Product saved to the live catalogue." : "Product changes saved.");
     } catch (error) {
-      if (uploadedImagePath) {
-        const { error: cleanupError } = await supabase.storage.from("product-images").remove([uploadedImagePath]);
-        if (cleanupError) console.warn("Could not clean up a failed product image upload", cleanupError.message);
+      if (uploadedImagePaths.length) {
+        const { error: cleanupError } = await supabase.storage.from("product-images").remove(uploadedImagePaths);
+        if (cleanupError) console.warn("Could not clean up failed product image uploads", cleanupError.message);
       }
       const message = error instanceof Error ? error.message : "Could not save the product.";
       setProductError(message.toLowerCase().includes("products_distributor_sku_key") || message.toLowerCase().includes("duplicate key")
@@ -876,34 +883,27 @@ export default function Home() {
               <label>Category *<input value={productDraft.category} onChange={e=>setProductDraft(v=>({...v,category:e.target.value}))} placeholder="e.g. Crockery" maxLength={80} required list="supplydesk-category-suggestions"/><datalist id="supplydesk-category-suggestions">{productCategories.filter(x=>x!=="All products").map(x=><option value={x} key={x}/>)}</datalist></label>
               <label>Brand<input value={productDraft.brand} onChange={e=>setProductDraft(v=>({...v,brand:e.target.value}))} placeholder="Brand name" maxLength={100}/></label>
               <label>Selling unit *<select value={productDraft.unit} onChange={e=>setProductDraft(v=>({...v,unit:e.target.value}))}><option value="piece">Piece</option><option value="box">Box</option><option value="carton">Carton</option><option value="set">Set</option><option value="pack">Pack</option></select></label>
+              <label>Product variant type *<select value={productDraft.productType} onChange={e=>setProductDraft(v=>({...v,productType:e.target.value as "color" | "non_color",colorName:e.target.value==="color"?v.colorName:""}))}><option value="non_color">Non-Color Variant</option><option value="color">Color Variant</option></select></label>
+              {productDraft.productType === "color" && <label>Color name *<input value={productDraft.colorName} onChange={e=>setProductDraft(v=>({...v,colorName:e.target.value}))} placeholder="e.g. Red, Black, Gold" maxLength={60} required/></label>}
+              <label>Size / capacity (liters)<input type="number" min="0.01" step="0.01" value={productDraft.capacityLiters} onChange={e=>setProductDraft(v=>({...v,capacityLiters:e.target.value}))} placeholder="e.g. 1.5"/></label>
               <label>Pieces per unit *<input type="number" min="1" step="1" value={productDraft.piecesPerUnit} onChange={e=>setProductDraft(v=>({...v,piecesPerUnit:e.target.value}))} required/></label>
               <label>Minimum order quantity *<input type="number" min="1" step="1" value={productDraft.minimumOrderQuantity} onChange={e=>setProductDraft(v=>({...v,minimumOrderQuantity:e.target.value}))} required/></label>
               <label>Wholesale price per unit (₹) *<input type="number" min="0" step="0.01" value={productDraft.price} onChange={e=>setProductDraft(v=>({...v,price:e.target.value}))} placeholder="0.00" required/></label>
               <label>Available stock (units) *<input type="number" min="0" step="1" value={productDraft.stock} onChange={e=>setProductDraft(v=>({...v,stock:e.target.value}))} required/></label>
-              <label className="product-image-field">Product image<input ref={productImageInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={event => {
-                const file = event.target.files?.[0];
-                if (!file) return;
+              <label className="product-image-field">Product photos *<input ref={productImageInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={event => {
+                const files = Array.from(event.target.files || []);
+                if (!files.length) return;
+                if (files.some(file => file.size > 20 * 1024 * 1024)) { setProductError("Each image must be smaller than 20 MB."); return; }
                 setProductError("");
-                setBackgroundRemoving(true);
-                setProductDraft(value => ({ ...value, imageUrl: "", imageFile: file, imagePreview: URL.createObjectURL(file) }));
-                void (async () => {
-                  try {
-                    const cutout = await removeProductImageBackground(file);
-                    const fittedBlob = await fitProductCutoutToCanvas(cutout);
-                    const fittedFile = new File([fittedBlob], "product-image.jpg", { type: "image/jpeg" });
-                    setProductDraft(value => ({ ...value, imageUrl: "", imageFile: fittedFile, imagePreview: URL.createObjectURL(fittedFile) }));
-                  } catch (error) {
-                    const message = error instanceof Error ? error.message : "Could not automatically fit this product image.";
-                    setProductError("Automatic image fitting failed; the original photo is kept. " + message);
-                  } finally { setBackgroundRemoving(false); }
-                })();
-              }} /><small>{backgroundRemoving ? "Automatically removing the background and fitting the full product to a square canvas…" : "Every selected photo is automatically prepared: full product visible, centered, and fitted to a square canvas."}</small></label>
+                const previews = files.map(file => URL.createObjectURL(file));
+                setProductDraft(value => ({ ...value, imageUrl: "", imageFile: null, imagePreview: previews[0] || "", imageFiles: files, imagePreviews: previews }));
+              }} /><small>Select multiple photos from your PC. The first photo is used as the main product image.</small></label>
               {(productDraft.imageFile || productDraft.imageUrl) && <div className="product-background-tool"><button className="btn btn-outline" type="button" disabled={productSaving || backgroundRemoving} onClick={handleRemoveProductBackground}><Sparkles size={15}/>{backgroundRemoving ? "Removing background…" : "Remove background"}</button><small>Removes the background and trims empty edges. First use downloads a one-time model (up to about 225 MB).</small></div>}
               <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 12 }}>
-                {productDraft.imagePreview ? <img src={productDraft.imagePreview} alt="Product image preview" style={{ width: 88, height: 88, objectFit: "contain", background: "#fff", borderRadius: 8, border: "1px solid #dce5e2" }} /> : <span style={{ color: "#718286", fontSize: 13 }}>No image selected</span>}
+                {productDraft.imagePreviews.length ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{productDraft.imagePreviews.map((src,index)=><img key={`${src}-${index}`} src={src} alt={`Product photo ${index+1}`} style={{ width: 88, height: 88, objectFit: "contain", background: "#fff", borderRadius: 8, border: "1px solid #dce5e2" }} />)}</div> : productDraft.imagePreview ? <img src={productDraft.imagePreview} alt="Product image preview" style={{ width: 88, height: 88, objectFit: "contain", background: "#fff", borderRadius: 8, border: "1px solid #dce5e2" }} /> : <span style={{ color: "#718286", fontSize: 13 }}>No image selected</span>}
                 {productDraft.imagePreview && <button className="btn btn-outline" type="button" disabled={productSaving} onClick={() => {
                   if (productImageInputRef.current) productImageInputRef.current.value = "";
-                  setProductDraft(value => ({ ...value, imageUrl: "", imageFile: null, imagePreview: "" }));
+                  setProductDraft(value => ({ ...value, imageUrl: "", imageFile: null, imagePreview: "", imageFiles: [], imagePreviews: [] }));
                 }}>Remove image</button>}
               </div>
             </div>
@@ -915,7 +915,7 @@ export default function Home() {
           <div className="catalogue-toolbar"><div className="search-box"><Search size={17}/><input placeholder="Search products or SKU..." value={search} onChange={e=>setSearch(e.target.value)}/>{search && <button onClick={()=>setSearch("")} aria-label="Clear search"><X size={14}/></button>}</div>{role === "dealer" && <button className="btn btn-outline cart-toolbar" onClick={()=>setShowCart(true)}><ShoppingCart size={16}/> Cart ({cartCount})</button>}</div>
           <div className="category-row">{productCategories.map(c=><button key={c} className={category===c?"category-chip active":"category-chip"} onClick={()=>setCategory(c)}>{c}</button>)}</div>
           {productError && role === "dealer" && <div className="empty-state"><AlertTriangle size={26}/><h3>Could not load the catalogue</h3><p>{productError}</p></div>}
-          {productsLoading ? <div className="empty-state"><Package size={28}/><h3>Loading catalogue</h3><p>Checking products saved in your business account.</p></div> : <><div className="product-grid">{groupedFiltered.map(({groupKey,variants})=>{const p=variants.find(v=>String(v.id)===selectedVariantByGroup[groupKey]) || variants[0];return <article className="product-card" key={groupKey}><div className={`product-visual ${p.color}`}><span className="product-category">{p.category}</span>{p.imagePath ? <><img className="product-image" src={p.imagePath} alt={p.name} loading="lazy"/></> : <div className="product-illustration">{p.mark}</div>}<span className={p.stock<20?"stock-label low":"stock-label"}>{p.stock<1?"Out of stock":p.stock<20?"Low stock":`${p.stock} ${p.unit}s in stock`}</span></div><div className="product-info"><div className="sku">{p.brand ? p.brand+" · " : ""}SKU {p.sku}</div><h3>{p.name.replace(/\s+\d+\s*L$/i,"")}</h3>{variants.length>1 && <label className="variant-picker-label">Size / Capacity<select className="variant-picker" value={String(p.id)} onChange={e=>setSelectedVariantByGroup(old=>({...old,[groupKey]:e.target.value}))}>{variants.map(v=><option key={v.id} value={String(v.id)}>{v.name.match(/\d+\s*L$/i)?.[0] || v.sku} · {money(v.price)} · {v.stock} in stock</option>)}</select></label>}<p>{p.piecesPerCarton} {p.unit === "piece" ? "piece" : "pieces"} per {p.unit} · Min. {p.minOrder}</p><div className="product-buy"><div><strong>{money(p.price)}</strong><small>per {p.unit.toLowerCase()}</small></div>{role === "dealer" ? <button className="add-btn" disabled={p.stock<p.minOrder} onClick={()=>{add(p,p.minOrder);flash(`${p.name} added to cart`);}}><Plus size={16}/> Add</button> : <button className="btn btn-outline product-edit-btn" type="button" onClick={()=>startEditProduct(p)}><Settings size={14}/> Edit</button>}</div>{role === "dealer" && cart.some(x=>x.product.id===p.id) && <div className="inline-quantity"><button onClick={()=>add(p,-1)} aria-label="Decrease quantity"><Minus size={13}/></button><span>{cart.find(x=>x.product.id===p.id)?.qty} in cart</span><button onClick={()=>add(p,1)} aria-label="Increase quantity"><Plus size={13}/></button></div>}</div></article>})}</div>{filtered.length===0&&<div className="empty-state"><Package size={30}/><h3>{productsLoading ? "Loading products" : search || category !== "All products" ? "No products found" : "No products yet"}</h3><p>{search || category !== "All products" ? "Try another search or category." : role === "distributor" ? "Select Add product above to publish your first item." : "Your distributor has not published products yet."}</p>{role === "distributor" && page === "Products & Stock" && <button className="btn btn-primary" onClick={startNewProduct}><Plus size={16}/> Add product</button>}</div>}</>}
+          {productsLoading ? <div className="empty-state"><Package size={28}/><h3>Loading catalogue</h3><p>Checking products saved in your business account.</p></div> : <><div className="product-grid">{groupedFiltered.map(({groupKey,variants})=>{const p=variants.find(v=>String(v.id)===selectedVariantByGroup[groupKey]) || variants[0];return <article className="product-card" key={groupKey}><div className={`product-visual ${p.color}`}><span className="product-category">{p.category}</span>{p.imagePath ? <><img className="product-image" src={(p.imagePaths?.[selectedPhotoByProduct[String(p.id)] || 0] || p.imagePath)} alt={p.name} loading="lazy"/>{(p.imagePaths?.length || 0) > 1 && <div className="product-photo-thumbs">{p.imagePaths?.map((src,index)=><button type="button" key={`${p.id}-photo-${index}`} aria-label={`Show product photo ${index+1}`} className={selectedPhotoByProduct[String(p.id)]===index?"active":""} onClick={()=>setSelectedPhotoByProduct(old=>({...old,[String(p.id)]:index}))}><img src={src} alt="" /></button>)}</div>}</> : <div className="product-illustration">{p.mark}</div>}<span className={p.stock<20?"stock-label low":"stock-label"}>{p.stock<1?"Out of stock":p.stock<20?"Low stock":`${p.stock} ${p.unit}s in stock`}</span></div><div className="product-info"><div className="sku">{p.brand ? p.brand+" · " : ""}SKU {p.sku}</div><h3>{p.name.replace(/\s+\d+\s*L$/i,"")}{p.capacityLiters ? ` · ${p.capacityLiters} L` : ""}{p.productType === "color" && p.colorName ? ` · ${p.colorName}` : ""}</h3>{variants.length>1 && <label className="variant-picker-label">Size / Capacity<select className="variant-picker" value={String(p.id)} onChange={e=>setSelectedVariantByGroup(old=>({...old,[groupKey]:e.target.value}))}>{variants.map(v=><option key={v.id} value={String(v.id)}>{v.name.match(/\d+\s*L$/i)?.[0] || v.sku} · {money(v.price)} · {v.stock} in stock</option>)}</select></label>}<p>{p.piecesPerCarton} {p.unit === "piece" ? "piece" : "pieces"} per {p.unit} · Min. {p.minOrder}</p><div className="product-buy"><div><strong>{money(p.price)}</strong><small>per {p.unit.toLowerCase()}</small></div>{role === "dealer" ? <button className="add-btn" disabled={p.stock<p.minOrder} onClick={()=>{add(p,p.minOrder);flash(`${p.name} added to cart`);}}><Plus size={16}/> Add</button> : <button className="btn btn-outline product-edit-btn" type="button" onClick={()=>startEditProduct(p)}><Settings size={14}/> Edit</button>}</div>{role === "dealer" && cart.some(x=>x.product.id===p.id) && <div className="inline-quantity"><button onClick={()=>add(p,-1)} aria-label="Decrease quantity"><Minus size={13}/></button><span>{cart.find(x=>x.product.id===p.id)?.qty} in cart</span><button onClick={()=>add(p,1)} aria-label="Increase quantity"><Plus size={13}/></button></div>}</div></article>})}</div>{filtered.length===0&&<div className="empty-state"><Package size={30}/><h3>{productsLoading ? "Loading products" : search || category !== "All products" ? "No products found" : "No products yet"}</h3><p>{search || category !== "All products" ? "Try another search or category." : role === "distributor" ? "Select Add product above to publish your first item." : "Your distributor has not published products yet."}</p>{role === "distributor" && page === "Products & Stock" && <button className="btn btn-primary" onClick={startNewProduct}><Plus size={16}/> Add product</button>}</div>}</>}
         </section>}
         {role === "distributor" && page === "Sales & Excel" && <section className="panel full-panel"><div className="panel-head"><div><h2>Delivered sales ledger</h2><p>Only delivered orders count as completed sales.</p></div><button className="btn btn-primary" onClick={csvExport}><FileSpreadsheet size={16}/> Export CSV for Excel</button></div><div className="sales-summary"><div><span>Completed sales value</span><strong>{money(orders.filter(o=>o.status==="Delivered").reduce((n,o)=>n+o.amount,0))}</strong></div><div><span>Delivered orders</span><strong>{orders.filter(o=>o.status==="Delivered").length}</strong></div><div><span>Pieces delivered</span><strong>{orders.filter(o=>o.status==="Delivered").reduce((n,o)=>n+o.pieces,0)}</strong></div></div><OrderTable orders={orders.filter(o=>o.status==="Delivered")} updateOrder={updateOrder}/></section>}
         {role === "distributor" && page === "Dealers" && <section className="panel full-panel"><div className="panel-head"><div><h2>Dealer accounts</h2><p>Review dealers linked to your distributor account.</p></div><span className="soft-count">{dealers.length} dealers</span></div>{dealersLoading ? <p className="helper-note">Loading dealer accounts…</p> : dealers.length === 0 ? <div className="empty-table">No dealers are linked to this distributor yet.</div> : dealers.map((d) => <div className="dealer-row" key={d.user_id}><div className="avatar">{String(d.store_name || "D").slice(0,2).toUpperCase()}</div><div className="dealer-details"><strong>{d.store_name || "Unnamed shop"}</strong><small>{[d.contact_name,d.address,d.city].filter(Boolean).join(" · ")}</small></div><span className={`status status-${String(d.review_status).replaceAll("_","-")}`}>{String(d.review_status).replaceAll("_"," ")}</span>{d.review_status === "pending" ? <div className="row-actions"><button className="accept-btn" onClick={()=>reviewDealer(d.user_id,"approved")} title="Approve dealer"><Check size={15}/></button><button className="reject-btn" onClick={()=>reviewDealer(d.user_id,"rejected")} title="Reject dealer"><X size={15}/></button></div> : <span className="table-time">—</span>}</div>)}</section>}
