@@ -154,6 +154,44 @@ async function removeProductImageBackground(source: Blob): Promise<Blob> {
   });
 }
 
+async function fitProductCutoutToCanvas(source: Blob): Promise<Blob> {
+  const bitmap = await createImageBitmap(source);
+  try {
+    const boundsCanvas = document.createElement("canvas");
+    boundsCanvas.width = bitmap.width;
+    boundsCanvas.height = bitmap.height;
+    const boundsContext = boundsCanvas.getContext("2d", { willReadFrequently: true });
+    if (!boundsContext) throw new Error("This product image could not be fitted to the canvas.");
+    boundsContext.drawImage(bitmap, 0, 0);
+    const pixels = boundsContext.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    let minX = bitmap.width, minY = bitmap.height, maxX = -1, maxY = -1;
+    for (let y = 0; y < bitmap.height; y++) {
+      for (let x = 0; x < bitmap.width; x++) {
+        if (pixels[(y * bitmap.width + x) * 4 + 3] < 24) continue;
+        minX = Math.min(minX, x); minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+      }
+    }
+    if (maxX < minX || maxY < minY) throw new Error("No product was detected in the prepared image.");
+    const padding = Math.round(Math.max(maxX - minX + 1, maxY - minY + 1) * 0.045);
+    const cropX = Math.max(0, minX - padding), cropY = Math.max(0, minY - padding);
+    const cropWidth = Math.min(bitmap.width, maxX + padding + 1) - cropX;
+    const cropHeight = Math.min(bitmap.height, maxY + padding + 1) - cropY;
+    const canvas = document.createElement("canvas");
+    canvas.width = 1024; canvas.height = 1024;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("This product image could not be fitted to the canvas.");
+    context.fillStyle = "#ffffff"; context.fillRect(0, 0, canvas.width, canvas.height);
+    const margin = 64;
+    const scale = Math.min((canvas.width - margin * 2) / cropWidth, (canvas.height - margin * 2) / cropHeight);
+    const drawWidth = cropWidth * scale, drawHeight = cropHeight * scale;
+    context.drawImage(bitmap, cropX, cropY, cropWidth, cropHeight, (canvas.width - drawWidth) / 2, (canvas.height - drawHeight) / 2, drawWidth, drawHeight);
+    const output = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/jpeg", 0.92));
+    if (!output) throw new Error("The fitted product image could not be exported as JPEG.");
+    return output;
+  } finally { bitmap.close(); }
+}
+
 export default function Home() {
   const [role, setRole] = useState<"distributor" | "dealer">("distributor");
   const [signedIn, setSignedIn] = useState(false);
@@ -846,11 +884,23 @@ export default function Home() {
                 const file = event.target.files?.[0];
                 if (!file) return;
                 setProductError("");
-                setProductDraft(value => ({ ...value, imageFile: file, imagePreview: URL.createObjectURL(file) }));
-              }} /><small>Select any product photo. Use Remove background to make it transparent.</small></label>
+                setBackgroundRemoving(true);
+                setProductDraft(value => ({ ...value, imageUrl: "", imageFile: file, imagePreview: URL.createObjectURL(file) }));
+                void (async () => {
+                  try {
+                    const cutout = await removeProductImageBackground(file);
+                    const fittedBlob = await fitProductCutoutToCanvas(cutout);
+                    const fittedFile = new File([fittedBlob], "product-image.jpg", { type: "image/jpeg" });
+                    setProductDraft(value => ({ ...value, imageUrl: "", imageFile: fittedFile, imagePreview: URL.createObjectURL(fittedFile) }));
+                  } catch (error) {
+                    const message = error instanceof Error ? error.message : "Could not automatically fit this product image.";
+                    setProductError("Automatic image fitting failed; the original photo is kept. " + message);
+                  } finally { setBackgroundRemoving(false); }
+                })();
+              }} /><small>{backgroundRemoving ? "Automatically removing the background and fitting the full product to a square canvas…" : "Every selected photo is automatically prepared: full product visible, centered, and fitted to a square canvas."}</small></label>
               {(productDraft.imageFile || productDraft.imageUrl) && <div className="product-background-tool"><button className="btn btn-outline" type="button" disabled={productSaving || backgroundRemoving} onClick={handleRemoveProductBackground}><Sparkles size={15}/>{backgroundRemoving ? "Removing background…" : "Remove background"}</button><small>Removes the background and trims empty edges. First use downloads a one-time model (up to about 225 MB).</small></div>}
               <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 12 }}>
-                {productDraft.imagePreview ? <img src={productDraft.imagePreview} alt="Product image preview" style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 8, border: "1px solid #dce5e2" }} /> : <span style={{ color: "#718286", fontSize: 13 }}>No image selected</span>}
+                {productDraft.imagePreview ? <img src={productDraft.imagePreview} alt="Product image preview" style={{ width: 88, height: 88, objectFit: "contain", background: "#fff", borderRadius: 8, border: "1px solid #dce5e2" }} /> : <span style={{ color: "#718286", fontSize: 13 }}>No image selected</span>}
                 {productDraft.imagePreview && <button className="btn btn-outline" type="button" disabled={productSaving} onClick={() => {
                   if (productImageInputRef.current) productImageInputRef.current.value = "";
                   setProductDraft(value => ({ ...value, imageUrl: "", imageFile: null, imagePreview: "" }));
