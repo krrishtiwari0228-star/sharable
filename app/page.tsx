@@ -570,7 +570,7 @@ export default function Home() {
         categoryId = newCategory.id;
       }
       const currentEditingProduct = editingProductId === null ? undefined : products.find(p => p.id === editingProductId);
-      let imagePaths = productDraft.imagePreviews.filter(path => !path.startsWith("blob:"));
+      const imagePaths = productDraft.imagePreviews.filter(path => !path.startsWith("blob:"));
       const filesToUpload = productDraft.imageFiles.length ? productDraft.imageFiles : productDraft.imageFile ? [productDraft.imageFile] : [];
       for (const file of filesToUpload) {
         const imageBlob = await encodeProductImage(file);
