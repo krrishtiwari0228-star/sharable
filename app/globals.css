@@ -75,3 +75,7 @@
   .content-wrap{padding-top:25px}
   .product-visual{height:144px}
 }
+
+/* Let portrait product photos use a square card frame without cropping. */
+.product-visual{height:auto;aspect-ratio:1/1}
+.product-visual .product-image{max-height:none;padding:12px}
