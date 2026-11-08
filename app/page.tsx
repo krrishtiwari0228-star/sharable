@@ -912,9 +912,26 @@ export default function Home() {
                 if (!files.length) return;
                 if (files.some(file => file.size > 20 * 1024 * 1024)) { setProductError("Each image must be smaller than 20 MB."); return; }
                 setProductError("");
-                const previews = files.map(file => URL.createObjectURL(file));
-                setProductDraft(value => ({ ...value, imageUrl: "", imageFile: null, imagePreview: previews[0] || "", imageFiles: files, imagePreviews: previews }));
-              }} /><small>Select multiple photos from your PC. The first photo is used as the main product image.</small></label>
+                setProductDraft(value => {
+                  const existingFiles = value.imageFiles;
+                  const combinedFiles = [...existingFiles];
+                  for (const file of files) {
+                    if (!combinedFiles.some(existing => existing.name === file.name && existing.size === file.size && existing.lastModified === file.lastModified)) {
+                      combinedFiles.push(file);
+                    }
+                  }
+                  const addedFiles = combinedFiles.slice(existingFiles.length);
+                  const addedPreviews = addedFiles.map(file => URL.createObjectURL(file));
+                  const combinedPreviews = [...value.imagePreviews, ...addedPreviews];
+                  if (combinedPreviews.length > 8) {
+                    addedPreviews.forEach(preview => URL.revokeObjectURL(preview));
+                    setProductError("A product can have up to 8 photos. Remove some photos before adding more.");
+                    return value;
+                  }
+                  return { ...value, imageUrl: "", imageFile: null, imagePreview: value.imagePreview || combinedPreviews[0] || "", imageFiles: combinedFiles, imagePreviews: combinedPreviews };
+                });
+                event.target.value = "";
+              }} /><small>Add photos in multiple selections (up to 8 total). Existing photos stay in the gallery; the first photo is the main product image.</small></label>
               {(productDraft.imageFile || productDraft.imageUrl) && <div className="product-background-tool"><button className="btn btn-outline" type="button" disabled={productSaving || backgroundRemoving} onClick={handleRemoveProductBackground}><Sparkles size={15}/>{backgroundRemoving ? "Removing background…" : "Remove background"}</button><small>Removes the background and trims empty edges. First use downloads a one-time model (up to about 225 MB).</small></div>}
               <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 12 }}>
                 {productDraft.imagePreviews.length ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{productDraft.imagePreviews.map((src,index)=><img key={`${src}-${index}`} src={src} alt={`Product photo ${index+1}`} style={{ width: 88, height: 88, objectFit: "contain", background: "#fff", borderRadius: 8, border: "1px solid #dce5e2" }} />)}</div> : productDraft.imagePreview ? <img src={productDraft.imagePreview} alt="Product image preview" style={{ width: 88, height: 88, objectFit: "contain", background: "#fff", borderRadius: 8, border: "1px solid #dce5e2" }} /> : <span style={{ color: "#718286", fontSize: 13 }}>No image selected</span>}
