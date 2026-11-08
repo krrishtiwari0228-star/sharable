@@ -221,3 +221,21 @@ html[data-theme="dark"] .accept-btn,
 html[data-theme="dark"] .deliver-btn{background:#202a31;border-color:#34434c;color:#78c9d4}
 html[data-theme="dark"] .inline-quantity{background:#202a31;border-color:#34434c;color:#78c9d4}
 html[data-theme="dark"] .checkout-note{background:#202a31;color:#78c9d4}
+
+/* Dark theme: keep product editor surfaces and typography readable. */
+html[data-theme="dark"] .product-form,
+html[data-theme="dark"] .product-variants-editor{background:#191c22!important;border-color:#343a44!important;color:#eef1f5}
+html[data-theme="dark"] .product-form-title strong,
+html[data-theme="dark"] .product-variants-editor strong{color:#eef1f5!important}
+html[data-theme="dark"] .product-form-title span,
+html[data-theme="dark"] .product-variants-editor small,
+html[data-theme="dark"] .product-form-grid label,
+html[data-theme="dark"] .product-image-field small{color:#aeb5bf!important}
+html[data-theme="dark"] .product-form-grid input,
+html[data-theme="dark"] .product-form-grid select{background:#111318!important;color:#f1f3f5!important;border-color:#343a44!important}
+html[data-theme="dark"] .product-form-grid input::placeholder{color:#818a96!important}
+html[data-theme="dark"] .product-form-grid input:focus,
+html[data-theme="dark"] .product-form-grid select:focus{border-color:#25a6b8!important;box-shadow:0 0 0 3px #25a6b81c!important}
+html[data-theme="dark"] .product-form-actions .btn-outline,
+html[data-theme="dark"] .product-variants-editor .btn-outline{background:#252831!important;color:#e1e5eb!important;border-color:#3b414b!important}
+html[data-theme="dark"] .product-form-grid input[type="file"]{background:#111318!important;color:#e1e5eb!important}
