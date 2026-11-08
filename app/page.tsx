@@ -555,8 +555,8 @@ export default function Home() {
     const stock = Number(productDraft.stock);
     if (!name || !sku || !categoryName) { setProductError("Enter product name, SKU and category."); return; }
     if (!["piece", "box", "carton", "set", "pack"].includes(unit)) { setProductError("Choose a valid selling unit."); return; }
-    if (productDraft.productType === "color" && productDraft.variants.some(v => !v.colorName.trim())) { setProductError("Enter a color name for each color variant."); return; }
-    if (productDraft.variants.some(v => v.capacityLiters.trim() && (!Number.isFinite(Number(v.capacityLiters)) || Number(v.capacityLiters) <= 0))) { setProductError("Enter a valid capacity for every variant."); return; }
+    if (productDraft.productType === "color" && productDraft.variants.some(v => !String(v.colorName ?? "").trim())) { setProductError("Enter a color name for each color variant."); return; }
+    if (productDraft.variants.some(v => String(v.capacityLiters ?? "").trim() && (!Number.isFinite(Number(v.capacityLiters)) || Number(v.capacityLiters) <= 0))) { setProductError("Enter a valid capacity for every variant."); return; }
     if (productDraft.capacityLiters.trim() && (!Number.isFinite(Number(productDraft.capacityLiters)) || Number(productDraft.capacityLiters) <= 0)) { setProductError("Enter a valid capacity in liters."); return; }
     if (!Number.isInteger(piecesPerUnit) || piecesPerUnit < 1 || !Number.isInteger(minimumOrderQuantity) || minimumOrderQuantity < 1 || !Number.isInteger(stock) || stock < 0 || !Number.isFinite(price) || price < 0) {
       setProductError("Check price, stock, pack size and minimum order values.");
