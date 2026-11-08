@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, CheckCircle2, AlertTriangle, Sparkles, Store as StoreIcon } from "lucide-react";
+import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, CheckCircle2, AlertTriangle, Sparkles, Store as StoreIcon, Sun, Moon } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 type Product = { id: string | number; name: string; category: string; brand: string; sku: string; unit: string; piecesPerCarton: number; minOrder: number; price: number; stock: number; color: string; mark: string; imagePath?: string; imagePaths?: string[]; productType?: string; colorName?: string; capacityLiters?: number | null; isActive?: boolean; reservedStock?: number };
@@ -193,7 +193,20 @@ async function fitProductCutoutToCanvas(source: Blob): Promise<Blob> {
 }
 
 export default function Home() {
-  const [role, setRole] = useState<"distributor" | "dealer">("distributor");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem("supplydesk-theme");
+    const initialTheme = savedTheme === "dark" ? "dark" : "light";
+    setTheme(initialTheme);
+    document.documentElement.dataset.theme = initialTheme;
+  }, []);
+  const toggleTheme = () => setTheme(current => {
+    const nextTheme = current === "light" ? "dark" : "light";
+    document.documentElement.dataset.theme = nextTheme;
+    window.localStorage.setItem("supplydesk-theme", nextTheme);
+    return nextTheme;
+  });
+  const [role, setRole = useState<"distributor" | "dealer">("distributor");
   const [signedIn, setSignedIn] = useState(false);
   const [loginRole, setLoginRole] = useState<"distributor" | "dealer">("dealer");
   const [loginEmail, setLoginEmail] = useState("");
@@ -862,7 +875,7 @@ export default function Home() {
     </aside>
     {mobileNav && <button className="scrim" onClick={() => setMobileNav(false)} aria-label="Close menu"/>}
     <main className="main-area">
-      <header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={() => setMobileNav(true)} aria-label="Open menu"><Menu size={20}/></button><div className="breadcrumb">Workspace <ChevronRight size={14}/> <strong>{page}</strong></div></div><div className="top-actions"><div className="status-pill"><span/> System operational</div><button className="icon-btn notification-btn" onClick={() => { setPage(role === "distributor" ? "Orders" : "My Orders"); }} aria-label="View notifications"><Bell size={19}/>{orders.some(o => o.status === "Pending") && <i/>}</button><div className="top-avatar">{role === "distributor" ? "AD" : "SG"}</div></div></header>
+      <header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={() => setMobileNav(true)} aria-label="Open menu"><Menu size={20}/></button><div className="breadcrumb">Workspace <ChevronRight size={14}/> <strong>{page}</strong></div></div><div className="top-actions"><div className="status-pill"><span/> System operational</div><button className="icon-btn theme-toggle" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`} title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>{theme === "light" ? <Moon size={19}/> : <Sun size={19}/>}</button><button className="icon-btn notification-btn" onClick={() => { setPage(role === "distributor" ? "Orders" : "My Orders"); }} aria-label="View notifications"><Bell size={19}/>{orders.some(o => o.status === "Pending") && <i/>}</button><div className="top-avatar">{role === "distributor" ? "AD" : "SG"}</div></div></header>
       <div className="content-wrap">
         <section className="page-heading"><div><div className="eyebrow">{role === "distributor" ? "DISTRIBUTOR WORKSPACE" : "DEALER WORKSPACE"} <span className="live-tag"><span/> LIVE</span></div><h1>{role === "distributor" && page === "Overview" ? <>Good morning, <em>Distributor.</em></> : title}</h1><p>{role === "distributor" ? (page === "Overview" ? "Here's what's happening with your distribution business today." : page === "Orders" ? "Review incoming orders and keep every delivery moving." : page === "Products & Stock" ? "Manage wholesale products, brands, carton quantities, prices and stock." : page === "Sales & Excel" ? "Review delivered sales and export reports for your records." : "Manage dealer access and account details.") : (page === "Product Catalogue" ? "Order crockery, glassware, kitchenware and homeware by carton or box." : page === "My Orders" ? "Track your orders from confirmation through delivery." : "Manage your shop details and orders.")}</p></div><div className="heading-actions">{role === "dealer" && <button className="btn btn-primary" onClick={() => setShowCart(true)}><ShoppingCart size={16}/> Cart <span className="button-count">{cartCount}</span></button>}{role === "distributor" && page === "Products & Stock" && <button className="btn btn-primary" onClick={startNewProduct}><Plus size={17}/> Add product</button>}{role === "distributor" && page === "Sales & Excel" && <button className="btn btn-primary" onClick={csvExport}><FileSpreadsheet size={16}/> Export Excel CSV</button>}</div></section>
         {role === "distributor" && page === "Overview" && <>
