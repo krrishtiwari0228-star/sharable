@@ -4,13 +4,14 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, CheckCircle2, AlertTriangle, Sparkles, Store as StoreIcon, Sun, Moon } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
-type Product = { id: string | number; name: string; category: string; brand: string; sku: string; unit: string; piecesPerCarton: number; minOrder: number; price: number; stock: number; color: string; mark: string; imagePath?: string; imagePaths?: string[]; productType?: string; colorName?: string; capacityLiters?: number | null; isActive?: boolean; reservedStock?: number };
-type ProductDraft = { name: string; sku: string; brand: string; category: string; unit: string; piecesPerUnit: string; minimumOrderQuantity: string; price: string; stock: string; imageUrl: string; imageFile: File | null; imagePreview: string; imageFiles: File[]; imagePreviews: string[]; productType: "color" | "non_color"; colorName: string; capacityLiters: string };
+type Product = { id: string | number; name: string; category: string; brand: string; sku: string; unit: string; piecesPerCarton: number; minOrder: number; price: number; stock: number; color: string; mark: string; imagePath?: string; imagePaths?: string[]; productType?: string; colorName?: string; capacityLiters?: number | null; variants?: ProductVariantDraft[]; isActive?: boolean; reservedStock?: number };
+type ProductVariantDraft = { colorName: string; capacityLiters: string };
+type ProductDraft = { name: string; sku: string; brand: string; category: string; unit: string; piecesPerUnit: string; minimumOrderQuantity: string; price: string; stock: string; imageUrl: string; imageFile: File | null; imagePreview: string; imageFiles: File[]; imagePreviews: string[]; productType: "color" | "non_color"; colorName: string; capacityLiters: string; variants: ProductVariantDraft[] };
 type CartLine = { product: Product; qty: number };
 type WholesaleOrder = { id: string; orderNumber: string; dealer: string; area: string; items: number; pieces: number; products: string[]; cancelReason: string; amount: number; status: string; time: string };
 type DealerProfile = { user_id: string; store_name: string; contact_name: string; address: string; city: string; review_status: "pending" | "approved" | "rejected" | "suspended"; created_at: string };
 type CategoryRow = { id: string; name: string };
-type ProductRow = { id: string; category_id: string | null; sku: string; name: string; brand: string | null; image_path: string | null; image_paths: string[] | null; product_type: string; color_name: string | null; capacity_liters: number | null; unit_label: string; pieces_per_unit: number; minimum_order_quantity: number; price: number | string; stock_on_hand: number; stock_reserved: number; is_active: boolean };
+type ProductRow = { id: string; category_id: string | null; sku: string; name: string; brand: string | null; image_path: string | null; image_paths: string[] | null; product_type: string; color_name: string | null; capacity_liters: number | null; variants: ProductVariantDraft[] | null; unit_label: string; pieces_per_unit: number; minimum_order_quantity: number; price: number | string; stock_on_hand: number; stock_reserved: number; is_active: boolean };
 type OrderItemRow = { quantity: number; pieces_per_unit_snapshot: number; product_name_snapshot: string; unit_label_snapshot: string };
 type DealerOrderSummary = { store_name: string | null; city: string | null };
 type OrderRow = { id: string; order_number: number | string; dealer_profiles: DealerOrderSummary | DealerOrderSummary[] | null; order_items: OrderItemRow[] | null; status: string; delivery_address: string | null; cancellation_reason: string | null; grand_total: number | string | null; created_at: string };
@@ -233,7 +234,7 @@ export default function Home() {
   const [productSaving, setProductSaving] = useState(false);
   const [backgroundRemoving, setBackgroundRemoving] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | number | null>(null);
-  const emptyProductDraft: ProductDraft = { name: "", sku: "", brand: "", category: "", unit: "carton", piecesPerUnit: "1", minimumOrderQuantity: "1", price: "", stock: "0", imageUrl: "", imageFile: null, imagePreview: "", imageFiles: [], imagePreviews: [], productType: "non_color", colorName: "", capacityLiters: "" };
+  const emptyProductDraft: ProductDraft = { name: "", sku: "", brand: "", category: "", unit: "carton", piecesPerUnit: "1", minimumOrderQuantity: "1", price: "", stock: "0", imageUrl: "", imageFile: null, imagePreview: "", imageFiles: [], imagePreviews: [], productType: "non_color", colorName: "", capacityLiters: "", variants: [{colorName:"",capacityLiters:""}] };
   const [productDraft, setProductDraft] = useState<ProductDraft>(emptyProductDraft);
   const productImageInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => () => {
@@ -440,7 +441,7 @@ export default function Home() {
       try {
         const [{ data: categoryRows, error: categoryLoadError }, { data: productRows, error: productLoadError }] = await Promise.all([
           supabase.from("categories").select("id,name"),
-          supabase.from("products").select("id,category_id,sku,name,brand,description,image_path,image_paths,product_type,color_name,capacity_liters,unit_label,pieces_per_unit,minimum_order_quantity,price,stock_on_hand,stock_reserved,is_active").eq("is_active", true)
+          supabase.from("products").select("id,category_id,sku,name,brand,description,image_path,image_paths,product_type,color_name,capacity_liters,variants,unit_label,pieces_per_unit,minimum_order_quantity,price,stock_on_hand,stock_reserved,is_active").eq("is_active", true)
         ]);
         if (categoryLoadError) throw categoryLoadError;
         if (productLoadError) throw productLoadError;
@@ -461,7 +462,7 @@ export default function Home() {
           reservedStock: Number(row.stock_reserved || 0),
           color: palette[index % palette.length],
           mark: "◉",
-          imagePath: row.image_path || "", imagePaths: row.image_paths?.length ? row.image_paths : row.image_path ? [row.image_path] : [], productType: row.product_type || "non_color", colorName: row.color_name || "", capacityLiters: row.capacity_liters,
+          imagePath: row.image_path || "", imagePaths: row.image_paths?.length ? row.image_paths : row.image_path ? [row.image_path] : [], productType: row.product_type || "non_color", colorName: row.color_name || "", capacityLiters: row.capacity_liters, variants: row.variants || [],
           isActive: row.is_active
         })));
       } catch (error) {
@@ -493,7 +494,7 @@ export default function Home() {
       stock: String(product.stock),
       imageUrl: product.imagePath || "",
       imageFile: null,
-      imagePreview: product.imagePath || "", imageFiles: [], imagePreviews: product.imagePaths?.length ? product.imagePaths : product.imagePath ? [product.imagePath] : [], productType: product.productType === "color" ? "color" : "non_color", colorName: product.colorName || "", capacityLiters: product.capacityLiters == null ? "" : String(product.capacityLiters)
+      imagePreview: product.imagePath || "", imageFiles: [], imagePreviews: product.imagePaths?.length ? product.imagePaths : product.imagePath ? [product.imagePath] : [], productType: product.productType === "color" ? "color" : "non_color", colorName: product.colorName || "", capacityLiters: product.capacityLiters == null ? "" : String(product.capacityLiters), variants: product.variants?.length ? product.variants : [{colorName:product.colorName||"",capacityLiters:product.capacityLiters==null?"":String(product.capacityLiters)}]
     });
     setProductError("");
     setProductFormOpen(true);
@@ -552,7 +553,8 @@ export default function Home() {
     const stock = Number(productDraft.stock);
     if (!name || !sku || !categoryName) { setProductError("Enter product name, SKU and category."); return; }
     if (!["piece", "box", "carton", "set", "pack"].includes(unit)) { setProductError("Choose a valid selling unit."); return; }
-    if (productDraft.productType === "color" && !productDraft.colorName.trim()) { setProductError("Enter a color name for this color variant."); return; }
+    if (productDraft.productType === "color" && productDraft.variants.some(v => !v.colorName.trim())) { setProductError("Enter a color name for each color variant."); return; }
+    if (productDraft.variants.some(v => v.capacityLiters.trim() && (!Number.isFinite(Number(v.capacityLiters)) || Number(v.capacityLiters) <= 0))) { setProductError("Enter a valid capacity for every variant."); return; }
     if (productDraft.capacityLiters.trim() && (!Number.isFinite(Number(productDraft.capacityLiters)) || Number(productDraft.capacityLiters) <= 0)) { setProductError("Enter a valid capacity in liters."); return; }
     if (!Number.isInteger(piecesPerUnit) || piecesPerUnit < 1 || !Number.isInteger(minimumOrderQuantity) || minimumOrderQuantity < 1 || !Number.isInteger(stock) || stock < 0 || !Number.isFinite(price) || price < 0) {
       setProductError("Check price, stock, pack size and minimum order values.");
@@ -606,6 +608,7 @@ export default function Home() {
         product_type: productDraft.productType,
         color_name: productDraft.productType === "color" ? productDraft.colorName.trim() || null : null,
         capacity_liters: productDraft.capacityLiters.trim() ? Number(productDraft.capacityLiters) : null,
+        variants: productDraft.variants.map(v => ({colorName: productDraft.productType === "color" ? v.colorName.trim() : null, capacityLiters: v.capacityLiters.trim() ? Number(v.capacityLiters) : null})),
         unit_label: unit,
         pieces_per_unit: piecesPerUnit,
         minimum_order_quantity: minimumOrderQuantity,
@@ -628,7 +631,7 @@ export default function Home() {
         id: savedId, name, category: categoryName, brand, sku, unit,
         piecesPerCarton: piecesPerUnit, minOrder: minimumOrderQuantity,
         price, stock, color: "sage", mark: "◉",
-        imagePath: imagePath || "", imagePaths, productType: productDraft.productType, colorName: productDraft.colorName.trim(), capacityLiters: productDraft.capacityLiters.trim() ? Number(productDraft.capacityLiters) : null, isActive: true,
+        imagePath: imagePath || "", imagePaths, productType: productDraft.productType, colorName: productDraft.colorName.trim(), capacityLiters: productDraft.capacityLiters.trim() ? Number(productDraft.capacityLiters) : null, variants: productDraft.variants, isActive: true,
         reservedStock: currentEditingProduct?.reservedStock || 0
       };
       setProducts(old => editingProductId === null ? [savedProduct, ...old] : old.map(p => p.id === editingProductId ? savedProduct : p));
@@ -896,9 +899,8 @@ export default function Home() {
               <label>Category *<input value={productDraft.category} onChange={e=>setProductDraft(v=>({...v,category:e.target.value}))} placeholder="e.g. Crockery" maxLength={80} required list="supplydesk-category-suggestions"/><datalist id="supplydesk-category-suggestions">{productCategories.filter(x=>x!=="All products").map(x=><option value={x} key={x}/>)}</datalist></label>
               <label>Brand<input value={productDraft.brand} onChange={e=>setProductDraft(v=>({...v,brand:e.target.value}))} placeholder="Brand name" maxLength={100}/></label>
               <label>Selling unit *<select value={productDraft.unit} onChange={e=>setProductDraft(v=>({...v,unit:e.target.value}))}><option value="piece">Piece</option><option value="box">Box</option><option value="carton">Carton</option><option value="set">Set</option><option value="pack">Pack</option></select></label>
-              <label>Product variant type *<select value={productDraft.productType} onChange={e=>setProductDraft(v=>({...v,productType:e.target.value as "color" | "non_color",colorName:e.target.value==="color"?v.colorName:""}))}><option value="non_color">Non-Color Variant</option><option value="color">Color Variant</option></select></label>
-              {productDraft.productType === "color" && <label>Color name *<input value={productDraft.colorName} onChange={e=>setProductDraft(v=>({...v,colorName:e.target.value}))} placeholder="e.g. Red, Black, Gold" maxLength={60} required/></label>}
-              <label>Size / capacity (liters)<input type="number" min="0.01" step="0.01" value={productDraft.capacityLiters} onChange={e=>setProductDraft(v=>({...v,capacityLiters:e.target.value}))} placeholder="e.g. 1.5"/></label>
+              <label>Product variant type *<select value={productDraft.productType} onChange={e=>setProductDraft(v=>({...v,productType:e.target.value as "color" | "non_color",colorName:e.target.value==="color"?v.colorName:"",variants:e.target.value==="color"?v.variants:[{colorName:"",capacityLiters:""}]}))}><option value="non_color">Non-Color Variant</option><option value="color">Color Variant</option></select></label>
+              <div className="product-variants-editor" style={{gridColumn:"1 / -1",border:"1px solid var(--line)",borderRadius:12,padding:14,display:"grid",gap:12}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><strong>Size & color variations</strong><button className="btn btn-outline" type="button" onClick={()=>setProductDraft(v=>({...v,variants:[...v.variants,{colorName:"",capacityLiters:""}]}))}>+ Add variant</button></div><small>Add one row for each available color/size combination. Product photos are uploaded below as the shared gallery.</small>{productDraft.variants.map((variant,index)=><div key={index} style={{display:"grid",gridTemplateColumns:productDraft.productType==="color"?"1fr 1fr auto":"1fr auto",gap:10,alignItems:"end"}}>{productDraft.productType==="color"&&<label>Color {index+1} *<input value={variant.colorName} onChange={e=>setProductDraft(v=>({...v,variants:v.variants.map((item,i)=>i===index?{...item,colorName:e.target.value}:item)}))} placeholder="e.g. Red" required/></label>}<label>Capacity (liters)<input type="number" min="0.01" step="0.01" value={variant.capacityLiters} onChange={e=>setProductDraft(v=>({...v,variants:v.variants.map((item,i)=>i===index?{...item,capacityLiters:e.target.value}:item)}))} placeholder="e.g. 1.5"/></label>{productDraft.variants.length>1&&<button type="button" className="btn btn-outline" onClick={()=>setProductDraft(v=>({...v,variants:v.variants.filter((_,i)=>i!==index)}))}>Remove</button>}</div>)}</div>
               <label>Pieces per unit *<input type="number" min="1" step="1" value={productDraft.piecesPerUnit} onChange={e=>setProductDraft(v=>({...v,piecesPerUnit:e.target.value}))} required/></label>
               <label>Minimum order quantity *<input type="number" min="1" step="1" value={productDraft.minimumOrderQuantity} onChange={e=>setProductDraft(v=>({...v,minimumOrderQuantity:e.target.value}))} required/></label>
               <label>Wholesale price per unit (₹) *<input type="number" min="0" step="0.01" value={productDraft.price} onChange={e=>setProductDraft(v=>({...v,price:e.target.value}))} placeholder="0.00" required/></label>
