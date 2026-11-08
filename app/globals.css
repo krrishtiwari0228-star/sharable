@@ -129,3 +129,25 @@
 .toast{background:#173b48}
 .toast>svg{color:#b9e4e5}
 @media(max-width:700px){.nav-item.selected{box-shadow:inset 3px 0 #176b78}}
+
+/* User-selectable dark theme */
+html[data-theme="dark"]{color-scheme:dark;--ink:#e7eee8;--muted:#9ba99e;--line:#29372e;--paper:#111812;--green:#7fbd95;--green-dark:#a0d2b0;--green-soft:#1e3024;--shadow:0 8px 26px rgba(0,0,0,.2)}
+html[data-theme="dark"] body{background:var(--paper);color:var(--ink)}
+html[data-theme="dark"] .sidebar,html[data-theme="dark"] .topbar,html[data-theme="dark"] .metric-card,html[data-theme="dark"] .panel,html[data-theme="dark"] .table-card,html[data-theme="dark"] .modal,html[data-theme="dark"] .product-card,html[data-theme="dark"] .cart-panel,html[data-theme="dark"] .dropdown-menu{background:#18221a;color:var(--ink);border-color:var(--line)}
+html[data-theme="dark"] .main-area,html[data-theme="dark"] .content-wrap{background:var(--paper)}
+html[data-theme="dark"] .role-switch,html[data-theme="dark"] .status-pill,html[data-theme="dark"] .live-tag,html[data-theme="dark"] .help-card,html[data-theme="dark"] .nav-item:hover,html[data-theme="dark"] .nav-item.selected,html[data-theme="dark"] .metric-icon.green,html[data-theme="dark"] .btn-outline{background:#223027;border-color:#314338;color:#c8e4d0}
+html[data-theme="dark"] .nav-item,html[data-theme="dark"] .icon-btn,html[data-theme="dark"] .breadcrumb,html[data-theme="dark"] .metric-top,html[data-theme="dark"] .page-heading p,html[data-theme="dark"] .help-card p,html[data-theme="dark"] .user-info small{color:#a4b1a6}
+html[data-theme="dark"] .nav-item.selected{color:#a5d8b4}
+html[data-theme="dark"] .btn-outline{color:#c9d8cc}
+html[data-theme="dark"] input,html[data-theme="dark"] select,html[data-theme="dark"] textarea,html[data-theme="dark"] .search-box,html[data-theme="dark"] .filter-select{background:#111a13;color:var(--ink);border-color:#344438}
+html[data-theme="dark"] input::placeholder,html[data-theme="dark"] textarea::placeholder{color:#77877a}
+html[data-theme="dark"] table,html[data-theme="dark"] th,html[data-theme="dark"] td,html[data-theme="dark"] .table-row{border-color:#2a382e;color:var(--ink)}
+html[data-theme="dark"] th,html[data-theme="dark"] .table-head{background:#202b22;color:#a9b8ac}
+html[data-theme="dark"] .feature-banner{background:#1c2b20;border-color:#2d4031}html[data-theme="dark"] .banner-symbol,html[data-theme="dark"] .art-box{background:#263b2b;border-color:#344c39}html[data-theme="dark"] .art-ring{border-color:#344c39}
+html[data-theme="dark"] .btn-primary{background:#34784d;border-color:#34784d;color:#fff}
+html[data-theme="dark"] .btn-primary:hover{background:#3f8b5c}
+html[data-theme="dark"] .product-image,html[data-theme="dark"] .product-photo-thumbs img{background:#202b22}
+html[data-theme="dark"] .divider,html[data-theme="dark"] hr{border-color:#2a382e}
+html[data-theme="dark"] .user-mini,html[data-theme="dark"] .settings{border-color:#2a382e}
+html[data-theme="dark"] .theme-toggle{color:#e5c875;background:#273329}
+@media(prefers-color-scheme:dark){html[data-theme="light"]{color-scheme:light}}
