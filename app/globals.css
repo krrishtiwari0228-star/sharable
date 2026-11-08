@@ -248,3 +248,7 @@ html[data-theme="dark"] .product-form-grid input[type="file"]{background:#111318
 .color-swatch-name{text-transform:capitalize}
 html[data-theme="dark"] .color-swatch{background:#202329;color:#e6e9ed;border-color:#343a44}
 html[data-theme="dark"] .color-swatch.selected{border-color:#25a6b8}
+
+.color-entry{display:grid;grid-template-columns:48px minmax(0,1fr) 24px;gap:8px;align-items:center}
+.color-entry .color-picker-input{width:48px;height:42px;padding:4px;cursor:pointer;background:#111318!important;border:1px solid #343a44!important;border-radius:9px}
+.color-entry-preview{width:20px;height:20px;border-radius:50%;border:1px solid #ffffff40;box-shadow:0 0 0 2px #00000018}
