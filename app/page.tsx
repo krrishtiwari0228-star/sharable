@@ -912,24 +912,22 @@ export default function Home() {
                 if (!files.length) return;
                 if (files.some(file => file.size > 20 * 1024 * 1024)) { setProductError("Each image must be smaller than 20 MB."); return; }
                 setProductError("");
-                setProductDraft(value => {
-                  const existingFiles = value.imageFiles;
-                  const combinedFiles = [...existingFiles];
-                  for (const file of files) {
-                    if (!combinedFiles.some(existing => existing.name === file.name && existing.size === file.size && existing.lastModified === file.lastModified)) {
-                      combinedFiles.push(file);
-                    }
+                const existingFiles = productDraft.imageFiles;
+                const combinedFiles = [...existingFiles];
+                for (const file of files) {
+                  if (!combinedFiles.some(existing => existing.name === file.name && existing.size === file.size && existing.lastModified === file.lastModified)) {
+                    combinedFiles.push(file);
                   }
-                  const addedFiles = combinedFiles.slice(existingFiles.length);
-                  const addedPreviews = addedFiles.map(file => URL.createObjectURL(file));
-                  const combinedPreviews = [...value.imagePreviews, ...addedPreviews];
-                  if (combinedPreviews.length > 8) {
-                    addedPreviews.forEach(preview => URL.revokeObjectURL(preview));
-                    setProductError("A product can have up to 8 photos. Remove some photos before adding more.");
-                    return value;
-                  }
-                  return { ...value, imageUrl: "", imageFile: null, imagePreview: value.imagePreview || combinedPreviews[0] || "", imageFiles: combinedFiles, imagePreviews: combinedPreviews };
-                });
+                }
+                const addedFiles = combinedFiles.slice(existingFiles.length);
+                if (productDraft.imagePreviews.length + addedFiles.length > 8) {
+                  setProductError("A product can have up to 8 photos. Remove some photos before adding more.");
+                  event.target.value = "";
+                  return;
+                }
+                const addedPreviews = addedFiles.map(file => URL.createObjectURL(file));
+                const combinedPreviews = [...productDraft.imagePreviews, ...addedPreviews];
+                setProductDraft(value => ({ ...value, imageUrl: "", imageFile: null, imagePreview: value.imagePreview || combinedPreviews[0] || "", imageFiles: combinedFiles, imagePreviews: combinedPreviews }));
                 event.target.value = "";
               }} /><small>Add photos in multiple selections (up to 8 total). Existing photos stay in the gallery; the first photo is the main product image.</small></label>
               {(productDraft.imageFile || productDraft.imageUrl) && <div className="product-background-tool"><button className="btn btn-outline" type="button" disabled={productSaving || backgroundRemoving} onClick={handleRemoveProductBackground}><Sparkles size={15}/>{backgroundRemoving ? "Removing background…" : "Remove background"}</button><small>Removes the background and trims empty edges. First use downloads a one-time model (up to about 225 MB).</small></div>}
