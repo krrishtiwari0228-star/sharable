@@ -7,7 +7,8 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/(.*)",
+        // Next.js header sources use path-to-regexp syntax; :path* matches all routes.
+        source: "/:path*",
         headers: [
           {
             key: "Content-Security-Policy",
