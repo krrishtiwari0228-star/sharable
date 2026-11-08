@@ -206,7 +206,7 @@ export default function Home() {
     window.localStorage.setItem("supplydesk-theme", nextTheme);
     return nextTheme;
   });
-  const [role, setRole = useState<"distributor" | "dealer">("distributor");
+  const [role, setRole] = useState<"distributor" | "dealer">("distributor");
   const [signedIn, setSignedIn] = useState(false);
   const [loginRole, setLoginRole] = useState<"distributor" | "dealer">("dealer");
   const [loginEmail, setLoginEmail] = useState("");
