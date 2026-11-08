@@ -239,3 +239,12 @@ html[data-theme="dark"] .product-form-grid select:focus{border-color:#25a6b8!imp
 html[data-theme="dark"] .product-form-actions .btn-outline,
 html[data-theme="dark"] .product-variants-editor .btn-outline{background:#252831!important;color:#e1e5eb!important;border-color:#3b414b!important}
 html[data-theme="dark"] .product-form-grid input[type="file"]{background:#111318!important;color:#e1e5eb!important}
+
+.product-color-swatches{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 12px}
+.color-swatch{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink);font-size:12px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.color-swatch:hover{border-color:var(--green)}
+.color-swatch.selected{border-color:var(--green);box-shadow:0 0 0 2px color-mix(in srgb,var(--green) 24%,transparent);font-weight:700}
+.color-swatch-dot{width:20px;height:20px;flex:0 0 20px;border-radius:50%;box-shadow:inset 0 0 0 1px #00000014}
+.color-swatch-name{text-transform:capitalize}
+html[data-theme="dark"] .color-swatch{background:#202329;color:#e6e9ed;border-color:#343a44}
+html[data-theme="dark"] .color-swatch.selected{border-color:#25a6b8}
