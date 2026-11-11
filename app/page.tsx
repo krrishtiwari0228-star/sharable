@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, CheckCircle2, AlertTriangle, Sparkles, Store as StoreIcon, Sun, Moon } from "lucide-react";
+import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, CheckCircle2, AlertTriangle, Sparkles, Images, Store as StoreIcon, Sun, Moon } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 type Product = { id: string | number; name: string; category: string; brand: string; sku: string; unit: string; piecesPerCarton: number; minOrder: number; price: number; stock: number; color: string; mark: string; imagePath?: string; imagePaths?: string[]; productType?: string; colorName?: string; capacityLiters?: number | null; variants?: ProductVariantDraft[]; isActive?: boolean; reservedStock?: number };
@@ -915,21 +915,43 @@ export default function Home() {
               <label>Minimum order quantity *<input type="number" min="1" step="1" value={productDraft.minimumOrderQuantity} onChange={e=>setProductDraft(v=>({...v,minimumOrderQuantity:e.target.value}))} required/></label>
               <label>Wholesale price per unit (₹) *<input type="number" min="0" step="0.01" value={productDraft.price} onChange={e=>setProductDraft(v=>({...v,price:e.target.value}))} placeholder="0.00" required/></label>
               <label>Available stock (units) *<input type="number" min="0" step="1" value={productDraft.stock} onChange={e=>setProductDraft(v=>({...v,stock:e.target.value}))} required/></label>
-              <label className="product-image-field">Product photos *<input ref={productImageInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={event => {
-                const files = Array.from(event.target.files || []);
-                if (!files.length) return;
-                if (files.some(file => file.size > 20 * 1024 * 1024)) { setProductError("Each image must be smaller than 20 MB."); return; }
-                setProductError("");
-                const previews = files.map(file => URL.createObjectURL(file));
-                setProductDraft(value => ({ ...value, imageUrl: "", imageFile: null, imagePreview: previews[0] || "", imageFiles: files, imagePreviews: previews }));
-              }} /><small>Select multiple photos from your PC. The first photo is used as the main product image.</small></label>
+              <div className="product-image-field">
+                <span className="product-image-field-label">Product photos *</span>
+                <div className="product-image-upload-panel">
+                  <input ref={productImageInputRef} className="product-image-input" type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label="Choose multiple product photos" onChange={event => {
+                    const input = event.currentTarget;
+                    const files = Array.from(input.files || []);
+                    input.value = "";
+                    if (!files.length) return;
+                    if (files.some(file => !["image/jpeg", "image/png", "image/webp"].includes(file.type))) { setProductError("Choose JPG, PNG or WebP photos."); return; }
+                    if (files.some(file => file.size > 20 * 1024 * 1024)) { setProductError("Each image must be smaller than 20 MB."); return; }
+                    setProductError("");
+                    const previews = files.map(file => URL.createObjectURL(file));
+                    setProductDraft(value => {
+                      const previousFiles = value.imageFiles.length ? value.imageFiles : value.imageFile ? [value.imageFile] : [];
+                      const previousPreviews = value.imagePreviews.length ? value.imagePreviews : value.imagePreview ? [value.imagePreview] : [];
+                      return {
+                        ...value,
+                        imageUrl: "",
+                        imageFile: null,
+                        imagePreview: value.imagePreview || previews[0] || "",
+                        imageFiles: [...previousFiles, ...files],
+                        imagePreviews: [...previousPreviews, ...previews],
+                      };
+                    });
+                  }} />
+                  <button className="btn btn-outline product-photo-select" type="button" onClick={() => productImageInputRef.current?.click()}><Images size={16}/>{productDraft.imagePreviews.length ? "Add more photos" : "Choose photos"}</button>
+                  <span className="product-image-count">{productDraft.imagePreviews.length} {productDraft.imagePreviews.length === 1 ? "photo" : "photos"} selected</span>
+                </div>
+                <small>Choose multiple JPG, PNG or WebP photos at once. Add more photos without replacing the ones already selected. The first photo is the main product image.</small>
+              </div>
               {(productDraft.imageFile || productDraft.imageUrl) && <div className="product-background-tool"><button className="btn btn-outline" type="button" disabled={productSaving || backgroundRemoving} onClick={handleRemoveProductBackground}><Sparkles size={15}/>{backgroundRemoving ? "Removing background…" : "Remove background"}</button><small>Removes the background and trims empty edges. First use downloads a one-time model (up to about 225 MB).</small></div>}
               <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 12 }}>
                 {productDraft.imagePreviews.length ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{productDraft.imagePreviews.map((src,index)=><img key={`${src}-${index}`} src={src} alt={`Product photo ${index+1}`} style={{ width: 88, height: 88, objectFit: "contain", background: "#fff", borderRadius: 8, border: "1px solid #dce5e2" }} />)}</div> : productDraft.imagePreview ? <img src={productDraft.imagePreview} alt="Product image preview" style={{ width: 88, height: 88, objectFit: "contain", background: "#fff", borderRadius: 8, border: "1px solid #dce5e2" }} /> : <span style={{ color: "#718286", fontSize: 13 }}>No image selected</span>}
                 {productDraft.imagePreview && <button className="btn btn-outline" type="button" disabled={productSaving} onClick={() => {
                   if (productImageInputRef.current) productImageInputRef.current.value = "";
                   setProductDraft(value => ({ ...value, imageUrl: "", imageFile: null, imagePreview: "", imageFiles: [], imagePreviews: [] }));
-                }}>Remove image</button>}
+                }}>Remove all photos</button>}
               </div>
             </div>
             <div className="product-form-actions"><button className="btn btn-primary" type="submit" disabled={productSaving}>{productSaving ? "Saving…" : editingProductId === null ? "Save product" : "Save changes"}</button><button className="btn btn-outline" type="button" disabled={productSaving} onClick={()=>{setProductFormOpen(false);setEditingProductId(null);setProductDraft(emptyProductDraft);setProductError("");}}>Cancel</button></div>
