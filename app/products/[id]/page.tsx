@@ -94,6 +94,8 @@ export default function ProductDetailsPage() {
     const load = async () => {
       setLoading(true);
       setError("");
+      setProducts([]);
+      setRole(null);
       const supabase = getSupabaseBrowserClient();
       if (!supabase) {
         setError("The product catalogue is not connected. Please try again later.");
