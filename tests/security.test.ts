@@ -29,7 +29,7 @@ function required(name: string): string {
 }
 
 const url = () => required("SUPABASE_URL");
-const anonKey = () => required("SUPABASE_ANON_KEY");
+const anonKey = () => required("NEXT_SUPABASE_ANON_KEY");
 
 function account(prefix: string): TestAccount {
   return {
@@ -105,7 +105,7 @@ describe("SupplyDesk tenant isolation (live Supabase)", () => {
   beforeAll(async () => {
     // Dedicated test identities only. Do not use production customer accounts.
     required("SUPABASE_URL");
-    required("SUPABASE_ANON_KEY");
+    required("NEXT_SUPABASE_ANON_KEY");
     dealerA = await signIn("TEST_DEALER_A");
     dealerB = await signIn("TEST_DEALER_B");
     distributorA = await signIn("TEST_DISTRIBUTOR_A");
