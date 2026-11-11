@@ -92,12 +92,14 @@ export default function SettingsPanel({ role }: { role: Role }) {
       if (!supabase) throw new Error("Supabase is not configured.");
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error("Your session has expired. Sign in again.");
+      const profilePhone = section === "business" && role === "dealer" ? form.contactPhone : form.phone;
+      const profileEmail = section === "business" && role === "dealer" ? form.contactEmail : form.email;
       const { error: identityError } = await supabase.from("profiles").update({
-        full_name: form.fullName.trim(), phone: form.phone.trim(), email: form.email.trim()
+        full_name: form.fullName.trim(), phone: profilePhone.trim(), email: profileEmail.trim()
       }).eq("id", user.id);
       if (identityError) throw identityError;
-      if (form.email.trim() && form.email.trim() !== user.email) {
-        const { error: emailError } = await supabase.auth.updateUser({ email: form.email.trim() });
+      if (profileEmail.trim() && profileEmail.trim() !== user.email) {
+        const { error: emailError } = await supabase.auth.updateUser({ email: profileEmail.trim() });
         if (emailError) throw new Error("Profile saved, but email verification could not be started: " + emailError.message);
       }
       if (role === "distributor") {
