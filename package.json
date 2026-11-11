@@ -28,5 +28,9 @@
     "typescript": "^5.8.0",
     "vitest": "^3.2.4",
     "dotenv": "^16.6.1"
+  },
+  "allowScripts": {
+    "sharp@0.34.5": true,
+    "esbuild@0.28.2": true
   }
 }
