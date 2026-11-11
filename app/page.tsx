@@ -731,7 +731,8 @@ export default function Home() {
     void (async () => {
       try {
         const supabase = getSupabaseBrowserClient();
-        const { data: { session }, error } = await supabase!.auth.getSession();
+        if (!supabase) throw new Error("Database connection is unavailable.");
+        const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
         if (!session?.user) throw new Error("Your session expired. Please sign in again.");
         window.sessionStorage.setItem(`supplydesk-cart:${session.user.id}`, JSON.stringify(nextCart));
@@ -740,7 +741,9 @@ export default function Home() {
           return;
         }
         flash(`${product.name} added to your cart.`);
+        pendingProductAddRef.current = false;
       } catch (error) {
+        pendingProductAddRef.current = false;
         flash(error instanceof Error ? error.message : "Could not save your cart.");
       }
     })();
@@ -757,7 +760,8 @@ export default function Home() {
     void (async () => {
       try {
         const supabase = getSupabaseBrowserClient();
-        const { data: { session }, error } = await supabase!.auth.getSession();
+        if (!supabase) throw new Error("Database connection is unavailable.");
+        const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
         if (!session?.user) throw new Error("Your session expired. Please sign in again.");
         const stored = window.sessionStorage.getItem(`supplydesk-cart:${session.user.id}`);
