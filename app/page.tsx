@@ -342,6 +342,21 @@ export default function Home() {
   const [selectedVariantByGroup, setSelectedVariantByGroup] = useState<Record<string, string>>({});
   const [selectedPhotoByProduct, setSelectedPhotoByProduct] = useState<Record<string, number>>({});
 
+  const groupedFiltered = useMemo(() => {
+    const groups = new Map<string, Product[]>();
+    for (const product of filtered) {
+      const match = product.sku.match(/^(.+?)-(\\d{2,})$/);
+      const groupKey = match ? match[1] : product.sku;
+      groups.set(groupKey, [...(groups.get(groupKey) || []), product]);
+    }
+    return Array.from(groups, ([groupKey, variants]) => ({
+      groupKey,
+      variants: variants.sort((a, b) =>
+        Number(a.sku.match(/-(\\d+)$/)?.[1] || 0) - Number(b.sku.match(/-(\\d+)$/)?.[1] || 0)
+      ),
+    }));
+  }, [filtered]);
+
 
   // Refresh the live catalogue whenever the app becomes visible again (e.g. returning to the tab).
   useEffect(() => {
