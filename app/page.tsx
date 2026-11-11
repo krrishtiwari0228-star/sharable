@@ -249,6 +249,7 @@ export default function Home() {
   const [cart, setCart] = useState<CartLine[]>([]);
   const pendingProductAddRef = useRef(false);
   const productsLoadedRef = useRef(false);
+  const cartStorageReadyRef = useRef(false);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All products");
   const [orders, setOrders] = useState<WholesaleOrder[]>([]);
@@ -689,40 +690,117 @@ export default function Home() {
   const flash = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(""), 3000); };
   const add = (product: Product, delta: number) => setCart(old => { const line = old.find(x => x.product.id === product.id); if (!line && delta > 0) return [...old, { product, qty: Math.min(Math.max(delta, product.minOrder), product.stock) }]; return old.map(x => x.product.id === product.id ? { ...x, qty: Math.max(product.minOrder, Math.min(product.stock, x.qty + delta)) } : x); });
 
-  // Product detail pages hand an authenticated dealer's selected item back to this
-  // workspace through a one-time URL handoff; cart state remains in this session.
+  // Product detail pages hand an authenticated dealer's selected item back to
+  // this workspace, then return to the detail page with a Go to cart action.
   useEffect(() => {
     if (!signedIn || productsLoading || !productsLoadedRef.current || pendingProductAddRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const productId = params.get("addProduct");
     if (!productId) return;
     const product = products.find(item => String(item.id) === productId);
-    if (!product) {
-      if (!productsLoading) {
-        params.delete("addProduct");
-        params.delete("quantity");
-        window.history.replaceState({}, "", window.location.pathname + (params.size ? `?${params.toString()}` : ""));
-        flash("That product is no longer available in your catalogue.");
-      }
+    if (!product || product.stock < product.minOrder) {
+      params.delete("addProduct");
+      params.delete("quantity");
+      params.delete("returnTo");
+      window.history.replaceState({}, "", window.location.pathname + (params.size ? `?${params.toString()}` : ""));
+      flash(product ? "This product does not have enough available stock." : "That product is no longer available in your catalogue.");
       return;
     }
+
     const requested = Number(params.get("quantity") || product.minOrder);
     const quantity = Number.isInteger(requested) && requested > 0
       ? Math.min(product.stock, Math.max(product.minOrder, requested))
       : product.minOrder;
+    const requestedReturnTo = params.get("returnTo") || "";
+    const returnTo = /^\/products\/[^/]+$/.test(requestedReturnTo) ? requestedReturnTo : "";
     params.delete("addProduct");
     params.delete("quantity");
+    params.delete("returnTo");
     window.history.replaceState({}, "", window.location.pathname + (params.size ? `?${params.toString()}` : ""));
     pendingProductAddRef.current = true;
-    setCart(old => {
-      const existing = old.find(line => line.product.id === product.id);
-      if (!existing) return [...old, { product, qty: quantity }];
-      return old.map(line => line.product.id === product.id
+
+    const existing = cart.find(line => line.product.id === product.id);
+    const nextCart = existing
+      ? cart.map(line => line.product.id === product.id
         ? { ...line, qty: Math.min(product.stock, Math.max(product.minOrder, line.qty + quantity)) }
-        : line);
-    });
-    flash(`${product.name} added to your cart.`);
+        : line)
+      : [...cart, { product, qty: quantity }];
+    setCart(nextCart);
+    cartStorageReadyRef.current = true;
+
+    void (async () => {
+      try {
+        const supabase = getSupabaseBrowserClient();
+        if (!supabase) throw new Error("Database connection is unavailable.");
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (!session?.user) throw new Error("Your session expired. Please sign in again.");
+        window.sessionStorage.setItem(`supplydesk-cart:${session.user.id}`, JSON.stringify(nextCart));
+        if (returnTo) {
+          window.location.assign(`${returnTo}?added=1`);
+          return;
+        }
+        flash(`${product.name} added to your cart.`);
+        pendingProductAddRef.current = false;
+      } catch (error) {
+        pendingProductAddRef.current = false;
+        flash(error instanceof Error ? error.message : "Could not save your cart.");
+      }
+    })();
+  }, [signedIn, products, productsLoading, cart]);
+
+  // Restore the current user's cart when the detail page's Go to cart action
+  // opens this workspace. Product details are refreshed from the live catalogue.
+  useEffect(() => {
+    if (!signedIn || productsLoading || !productsLoadedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("openCart") !== "1") return;
+    params.delete("openCart");
+    window.history.replaceState({}, "", window.location.pathname + (params.size ? `?${params.toString()}` : ""));
+    void (async () => {
+      try {
+        const supabase = getSupabaseBrowserClient();
+        if (!supabase) throw new Error("Database connection is unavailable.");
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (!session?.user) throw new Error("Your session expired. Please sign in again.");
+        const stored = window.sessionStorage.getItem(`supplydesk-cart:${session.user.id}`);
+        const parsed = stored ? JSON.parse(stored) as CartLine[] : [];
+        const restored = Array.isArray(parsed)
+          ? parsed.flatMap(line => {
+              const current = products.find(item => String(item.id) === String(line?.product?.id));
+              const qty = Number(line?.qty);
+              if (!current || !Number.isInteger(qty) || qty < current.minOrder || current.stock < current.minOrder) return [];
+              return [{ product: current, qty: Math.min(qty, current.stock) }];
+            })
+          : [];
+        setCart(restored);
+        cartStorageReadyRef.current = true;
+        setShowCart(true);
+      } catch (error) {
+        flash(error instanceof Error ? error.message : "Could not restore your cart.");
+        setShowCart(true);
+      }
+    })();
   }, [signedIn, products, productsLoading]);
+
+  // Keep cart changes made in the workspace available if the user opens another
+  // product detail page before checking out.
+  useEffect(() => {
+    if (!signedIn || !cartStorageReadyRef.current) return;
+    let active = true;
+    void (async () => {
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!active || !session?.user) return;
+      const key = `supplydesk-cart:${session.user.id}`;
+      if (cart.length) window.sessionStorage.setItem(key, JSON.stringify(cart));
+      else window.sessionStorage.removeItem(key);
+    })();
+    return () => { active = false; };
+  }, [cart, signedIn]);
+
   const updateOrder = async (id: string, status: string, reason = "") => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) { flash("Database connection is unavailable."); return; }

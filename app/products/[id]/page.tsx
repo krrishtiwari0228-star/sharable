@@ -88,6 +88,7 @@ export default function ProductDetailsPage() {
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [addedToCart, setAddedToCart] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -185,8 +186,18 @@ export default function ProductDetailsPage() {
   const addToCart = () => {
     if (!product || role !== "dealer" || product.stock < product.minimumOrder) return;
     const safeQuantity = Math.min(product.stock, Math.max(product.minimumOrder, Math.floor(quantity)));
-    window.location.assign(`/?addProduct=${encodeURIComponent(product.id)}&quantity=${safeQuantity}`);
+    const returnTo = `/products/${encodeURIComponent(product.id)}`;
+    window.location.assign(`/?addProduct=${encodeURIComponent(product.id)}&quantity=${safeQuantity}&returnTo=${encodeURIComponent(returnTo)}`);
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("added") === "1") {
+      setAddedToCart(true);
+      params.delete("added");
+      window.history.replaceState({}, "", window.location.pathname + (params.size ? `?${params.toString()}` : ""));
+    }
+  }, [productId]);
 
   return (
     <main className="product-page-shell">
@@ -282,7 +293,7 @@ export default function ProductDetailsPage() {
                     <label>Quantity ({product.unit})
                       <input type="number" min={product.minimumOrder} max={product.stock} step={product.minimumOrder} value={quantity} onChange={event => setQuantity(Number(event.target.value))}/>
                     </label>
-                    <button className="btn btn-primary" type="button" disabled={product.stock < product.minimumOrder || quantity < product.minimumOrder || quantity > product.stock} onClick={addToCart}><ShoppingCart size={17}/> Add to cart</button>
+                    <div className="product-page-cart-actions"><button className="btn btn-primary" type="button" disabled={product.stock < product.minimumOrder || quantity < product.minimumOrder || quantity > product.stock} onClick={addToCart}><ShoppingCart size={17}/> Add to cart</button>{addedToCart && <Link href="/?openCart=1" className="btn btn-outline product-page-go-cart"><ShoppingCart size={16}/> Go to cart</Link>}</div>
                   </div>
                 ) : (
                   <div className="product-page-distributor-note">Distributor view · Manage this item from Products & Stock in your workspace.</div>
