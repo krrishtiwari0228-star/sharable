@@ -4,8 +4,8 @@ import PwaInstall from "./pwa-install";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SupplyDesk | Grocery Distribution",
-  description: "Dealer ordering and distributor inventory management portal",
+  title: "SupplyDesk | Wholesale Operations",
+  description: "A professional wholesale workspace for distributors and dealers to manage products, orders, stock and deliveries.",
   applicationName: "SupplyDesk",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "SupplyDesk" },
