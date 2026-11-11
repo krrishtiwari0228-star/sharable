@@ -616,7 +616,7 @@ export default function Home() {
         product_type: productDraft.productType,
         color_name: productDraft.productType === "color" ? productDraft.colorName.trim() || null : null,
         capacity_liters: productDraft.capacityLiters.trim() ? Number(productDraft.capacityLiters) : null,
-        variants: productDraft.variants.map(v => ({colorName: productDraft.productType === "color" ? v.colorName.trim() : null, colorHex: productDraft.productType === "color" ? v.colorHex : null, capacityLiters: v.capacityLiters.trim() ? Number(v.capacityLiters) : null})),
+        variants: productDraft.variants.map(v => ({colorName: productDraft.productType === "color" ? String(v.colorName ?? "").trim() : null, colorHex: productDraft.productType === "color" ? v.colorHex : null, capacityLiters: String(v.capacityLiters ?? "").trim() ? Number(v.capacityLiters) : null})),
         unit_label: unit,
         pieces_per_unit: piecesPerUnit,
         minimum_order_quantity: minimumOrderQuantity,
