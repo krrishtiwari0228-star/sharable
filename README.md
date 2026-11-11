@@ -28,6 +28,11 @@ A responsive B2B wholesale ordering prototype for crockery, glassware, kitchenwa
 3. Copy `.env.example` to `.env.local` and add your Supabase project URL and anon key.
 4. Run `npm run dev`.
 
+## Verification
+- `npm run lint` — run ESLint.
+- `npm test` — run the Vitest suite.
+- `npm run build` — verify the production Next.js build.
+
 ## Required before real business use
 1. Configure Supabase Auth and distributor/dealer account onboarding.
 2. Implement and test least-privilege Row Level Security policies for every table.
