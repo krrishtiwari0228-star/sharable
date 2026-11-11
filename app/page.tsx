@@ -248,6 +248,7 @@ export default function Home() {
   }, [productDraft.imagePreview]);
   const [cart, setCart] = useState<CartLine[]>([]);
   const pendingProductAddRef = useRef(false);
+  const productsLoadedRef = useRef(false);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All products");
   const [orders, setOrders] = useState<WholesaleOrder[]>([]);
@@ -471,7 +472,7 @@ export default function Home() {
       } catch (error) {
         if (active) setProductError(error instanceof Error ? error.message : "Could not load products from the database.");
       } finally {
-        if (active) setProductsLoading(false);
+        if (active) { productsLoadedRef.current = true; setProductsLoading(false); }
       }
     };
     void loadProducts();
@@ -676,7 +677,7 @@ export default function Home() {
   // Product detail pages hand an authenticated dealer's selected item back to this
   // workspace through a one-time URL handoff; cart state remains in this session.
   useEffect(() => {
-    if (!signedIn || productsLoading || pendingProductAddRef.current) return;
+    if (!signedIn || productsLoading || !productsLoadedRef.current || pendingProductAddRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const productId = params.get("addProduct");
     if (!productId) return;
