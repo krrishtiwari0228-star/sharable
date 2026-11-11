@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, CircleUserRound, ArrowUpRight, CheckCircle2, AlertTriangle, Sparkles, Images, Store as StoreIcon, Sun, Moon } from "lucide-react";
+import { Bell, Search, ShoppingCart, Package, LayoutDashboard, ClipboardList, Boxes, Users, FileSpreadsheet, Settings, Plus, Minus, Check, Truck, ChevronRight, Menu, X, ArrowUpRight, CheckCircle2, AlertTriangle, Sparkles, Images, Store as StoreIcon, Sun, Moon } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import SettingsPanel from "@/components/settings-panel";
 
