@@ -885,3 +885,23 @@ html[data-theme="dark"] .settings-signout{background:#1d2a33;color:#dce7ec;borde
   .product-page-buy input { width: 100%; }
   .product-page-buy .btn { width: 100%; justify-content: center; }
 }
+
+
+.product-page-cart-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.product-page-go-cart {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+}
+@media(max-width:760px) {
+  .product-page-cart-actions { width: 100%; }
+  .product-page-cart-actions .btn { flex: 1 1 100%; justify-content: center; }
+}
