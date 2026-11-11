@@ -211,6 +211,7 @@ export default function Home() {
   });
   const [role, setRole] = useState<"distributor" | "dealer">("distributor");
   const [signedIn, setSignedIn] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const [loginRole, setLoginRole] = useState<"distributor" | "dealer">("dealer");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -232,6 +233,8 @@ export default function Home() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [productError, setProductError] = useState("");
   const [catalogueRefreshKey, setCatalogueRefreshKey] = useState(0);
+  const [ordersRefreshKey, setOrdersRefreshKey] = useState(0);
+  const ordersLoadedRef = useRef(false);
   const [productFormOpen, setProductFormOpen] = useState(false);
   const [productSaving, setProductSaving] = useState(false);
   const [backgroundRemoving, setBackgroundRemoving] = useState(false);
@@ -314,6 +317,8 @@ export default function Home() {
         window.localStorage.removeItem("supplydesk-demo-cart");
       } catch (error) {
         console.error("Could not restore SupplyDesk data", error);
+      } finally {
+        if (active) setAuthReady(true);
       }
     };
     void restore();
@@ -393,7 +398,7 @@ export default function Home() {
     const loadOrders = async () => {
       const supabase = getSupabaseBrowserClient();
       if (!supabase) return;
-      setOrdersLoading(true);
+      if (!ordersLoadedRef.current) setOrdersLoading(true);
       setOrderError("");
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -423,13 +428,14 @@ export default function Home() {
             time: new Date(o.created_at).toLocaleString("en-IN")
           };
         }));
+        ordersLoadedRef.current = true;
       } catch (error) {
         if (active) setOrderError(error instanceof Error ? error.message : "Could not load orders from the database.");
       } finally { if (active) setOrdersLoading(false); }
     };
     void loadOrders();
     return () => { active = false; };
-  }, [signedIn, role, catalogueRefreshKey]);
+  }, [signedIn, role, ordersRefreshKey]);
 
   // Load only rows visible to the authenticated user's RLS policies.
   useEffect(() => {
@@ -677,7 +683,7 @@ export default function Home() {
         });
         if (error) throw error;
       }
-      setCatalogueRefreshKey(value => value + 1);
+      setOrdersRefreshKey(value => value + 1);
       flash("Order updated successfully.");
     } catch (error) { flash(error instanceof Error ? error.message : "Could not update order."); }
   };
@@ -707,7 +713,7 @@ export default function Home() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Could not place your order.");
       setCart([]); setShowCart(false); setPage("My Orders");
-      setCatalogueRefreshKey(value => value + 1);
+      setOrdersRefreshKey(value => value + 1);
       flash("Order placed successfully and sent to your distributor.");
     } catch (error) { flash(error instanceof Error ? error.message : "Could not place your order."); }
     finally { setOrderBusy(false); }
@@ -717,6 +723,7 @@ export default function Home() {
   const csvExport = () => { const rows = [["Order ID", "Dealer", "Area", "Products", "Total Pieces", "Order Value (INR)", "Status", "Order Time"], ...orders.filter(o => o.status === "Delivered").map(o => [o.id, o.dealer, o.area, o.products.join("; "), o.pieces, o.amount, o.status, o.time])]; const csv = rows.map(r => r.map(v => `"${String(v).replaceAll('"', '""')}"`).join(",")).join("\r\n"); const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "wholesale-sales-report.csv"; a.click(); URL.revokeObjectURL(url); flash("Sales report exported. Open the CSV file in Excel."); };
   const title = page === "Overview" ? "Good morning, Distributor" : page;
   const isCatalogue = page === "Product Catalogue" || page === "Products & Stock" || page === "Overview";
+  if (!authReady) return <main className="login-screen"><section className="login-card"><div className="login-brand"><div className="brand-mark">s<span>.</span></div><div><strong>supplydesk</strong><small>WHOLESALE HOMEWARE</small></div></div><p className="login-intro" role="status">Restoring your secure session…</p></section></main>;
   if (!signedIn) return <main className="login-screen">
     <section className="login-card">
       <div className="login-brand"><div className="brand-mark">s<span>.</span></div><div><strong>supplydesk</strong><small>WHOLESALE HOMEWARE</small></div></div>
