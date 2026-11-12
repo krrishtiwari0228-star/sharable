@@ -608,6 +608,17 @@ export default function Home() {
       const { data: distributor, error: distributorError } = await supabase.from("distributors").select("id").eq("owner_id", user.id).eq("is_active", true).maybeSingle();
       if (distributorError) throw distributorError;
       if (!distributor?.id) throw new Error("Admin setup is incomplete: this account has no active distributor business yet. Complete the separate admin setup first.");
+
+      const currentEditingProduct = editingProductId === null ? undefined : products.find(p => p.id === editingProductId);
+      let duplicateSkuQuery = supabase.from("products")
+        .select("id")
+        .eq("distributor_id", distributor.id)
+        .eq("sku", sku);
+      if (currentEditingProduct) duplicateSkuQuery = duplicateSkuQuery.neq("id", String(currentEditingProduct.id));
+      const { data: duplicateSku, error: duplicateSkuError } = await duplicateSkuQuery.maybeSingle();
+      if (duplicateSkuError) throw duplicateSkuError;
+      if (duplicateSku) throw new Error(`SKU "${sku}" is already in use. Enter a different product code.`);
+
       let categoryId: string;
       const { data: existingCategory, error: categoryLookupError } = await supabase.from("categories").select("id").eq("distributor_id", distributor.id).ilike("name", categoryName).maybeSingle();
       if (categoryLookupError) throw categoryLookupError;
@@ -618,7 +629,6 @@ export default function Home() {
         if (categoryInsertError) throw categoryInsertError;
         categoryId = newCategory.id;
       }
-      const currentEditingProduct = editingProductId === null ? undefined : products.find(p => p.id === editingProductId);
       const imagePaths = productDraft.imagePreviews.filter(path => !path.startsWith("blob:"));
       const filesToUpload = productDraft.imageFiles.length ? productDraft.imageFiles : productDraft.imageFile ? [productDraft.imageFile] : [];
       for (const file of filesToUpload) {
@@ -679,9 +689,20 @@ export default function Home() {
         const { error: cleanupError } = await supabase.storage.from("product-images").remove(uploadedImagePaths);
         if (cleanupError) console.warn("Could not clean up failed product image uploads", cleanupError.message);
       }
-      const message = error instanceof Error ? error.message : "Could not save the product.";
-      setProductError(message.toLowerCase().includes("products_distributor_sku_key") || message.toLowerCase().includes("duplicate key")
-        ? "That SKU already exists in your catalogue. Use a unique SKU for each product."
+      const errorObject = error && typeof error === "object"
+        ? error as { message?: unknown; code?: unknown }
+        : null;
+      const message = error instanceof Error
+        ? error.message
+        : typeof error === "string"
+          ? error
+          : typeof errorObject?.message === "string"
+            ? errorObject.message
+            : "Could not save the product.";
+      const isDuplicateSku = String(errorObject?.code ?? "") === "23505"
+        && message.toLowerCase().includes("products_distributor_id_sku_key");
+      setProductError(isDuplicateSku
+        ? `SKU "${sku}" is already in use. Enter a different product code.`
         : message);
     } finally {
       setProductSaving(false);
