@@ -24,8 +24,8 @@ export async function GET(request: NextRequest) {
 
   let supabaseOrigin = "";
   try {
-    supabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL
-      ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin
+    supabaseOrigin = process.env.SUPABASE_URL
+      ? new URL(process.env.SUPABASE_URL).origin
       : "";
   } catch {
     // An invalid Supabase URL simply disables the Supabase image source below.
