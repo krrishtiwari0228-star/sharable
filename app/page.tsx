@@ -701,6 +701,7 @@ export default function Home() {
         savedId = saved.id;
       }
       uploadedImagePaths.length = 0;
+      productDraft.imagePreviews.filter(path=>path.startsWith("blob:")).forEach(path=>URL.revokeObjectURL(path));
       const savedProduct: Product = {
         id: savedId, name, category: categoryName, brand, sku, unit,
         piecesPerCarton: piecesPerUnit, minOrder: minimumOrderQuantity,
@@ -1135,14 +1136,22 @@ export default function Home() {
               </div>
               {(productDraft.imageFile || productDraft.imageUrl) && <div className="product-background-tool"><button className="btn btn-outline" type="button" disabled={productSaving || backgroundRemoving} onClick={handleRemoveProductBackground}><Sparkles size={15}/>{backgroundRemoving ? "Removing background…" : "Remove background"}</button><small>Removes the background and trims empty edges. First use downloads a one-time model (up to about 225 MB).</small></div>}
               <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 12 }}>
-                {productDraft.imagePreviews.length ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{productDraft.imagePreviews.map((src,index)=><img key={`${src}-${index}`} src={src} alt={`Product photo ${index+1}`} style={{ width: 88, height: 88, objectFit: "contain", background: "#fff", borderRadius: 8, border: "1px solid #dce5e2" }} />)}</div> : productDraft.imagePreview ? <img src={productDraft.imagePreview} alt="Product image preview" style={{ width: 88, height: 88, objectFit: "contain", background: "#fff", borderRadius: 8, border: "1px solid #dce5e2" }} /> : <span style={{ color: "#718286", fontSize: 13 }}>No image selected</span>}
-                {productDraft.imagePreview && <button className="btn btn-outline" type="button" disabled={productSaving} onClick={() => {
+                {productDraft.imagePreviews.length ? <div className="product-photo-preview-grid">{productDraft.imagePreviews.map((src,index)=><div className="product-photo-preview" key={String(index)+"-"+src}><img src={src} alt={"Product photo "+(index+1)} /><span>{index===0?"Main photo":"Photo "+(index+1)}</span><button type="button" aria-label={"Remove photo "+(index+1)} disabled={productSaving} onClick={() => setProductDraft(value => {
+                    const removed = value.imagePreviews[index];
+                    const blobIndex = removed?.startsWith("blob:") ? value.imagePreviews.slice(0,index+1).filter(path=>path.startsWith("blob:")).length-1 : -1;
+                    const nextPreviews = value.imagePreviews.filter((_,i)=>i!==index);
+                    const nextFiles = blobIndex < 0 ? value.imageFiles : value.imageFiles.filter((_,i)=>i!==blobIndex);
+                    if (removed?.startsWith("blob:")) URL.revokeObjectURL(removed);
+                    return {...value,imagePreviews:nextPreviews,imageFiles:nextFiles,imageFile:null,imagePreview:nextPreviews[0]||"",imageUrl:""};
+                  })}>×</button></div>)}</div> : productDraft.imagePreview ? <img src={productDraft.imagePreview} alt="Product image preview" style={{ width: 88, height: 88, objectFit: "contain", background: "#fff", borderRadius: 8, border: "1px solid #dce5e2" }} /> : <span style={{ color: "#718286", fontSize: 13 }}>No image selected</span>}
+                {(productDraft.imagePreviews.length>0 || productDraft.imagePreview || productDraft.imageUrl) && <button className="btn btn-outline" type="button" disabled={productSaving} onClick={() => {
                   if (productImageInputRef.current) productImageInputRef.current.value = "";
+                  productDraft.imagePreviews.filter(path=>path.startsWith("blob:")).forEach(path=>URL.revokeObjectURL(path));
                   setProductDraft(value => ({ ...value, imageUrl: "", imageFile: null, imagePreview: "", imageFiles: [], imagePreviews: [] }));
                 }}>Remove all photos</button>}
               </div>
             </div>
-            <div className="product-form-actions"><button className="btn btn-primary" type="submit" disabled={productSaving}>{productSaving ? "Saving…" : editingProductId === null ? "Save product" : "Save changes"}</button><button className="btn btn-outline" type="button" disabled={productSaving} onClick={()=>{setProductFormOpen(false);setEditingProductId(null);setProductDraft(emptyProductDraft);setProductError("");}}>Cancel</button></div>
+            <div className="product-form-actions"><button className="btn btn-primary" type="submit" disabled={productSaving}>{productSaving ? "Saving…" : editingProductId === null ? "Save product" : "Save changes"}</button><button className="btn btn-outline" type="button" disabled={productSaving} onClick={()=>{productDraft.imagePreviews.filter(path=>path.startsWith("blob:")).forEach(path=>URL.revokeObjectURL(path));setProductFormOpen(false);setEditingProductId(null);setProductDraft(emptyProductDraft);setProductError("");}}>Cancel</button></div>
           </form>}
           <div className="product-admin-footer"><span>{products.length} products saved in your catalogue</span><span>Saved products are shared with the assigned dealer catalogue subject to database access rules.</span></div>
         </section>}
