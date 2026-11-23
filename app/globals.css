@@ -905,3 +905,40 @@ html[data-theme="dark"] .settings-signout{background:#1d2a33;color:#dce7ec;borde
   .product-page-cart-actions { width: 100%; }
   .product-page-cart-actions .btn { flex: 1 1 100%; justify-content: center; }
 }
+
+
+/* Catalogue refinements */
+.product-title-button{
+  display:block;
+  width:100%;
+  min-height:2.7em;
+  margin:7px 0 5px;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:var(--ink);
+  font-family:Manrope,sans-serif;
+  font-size:13px;
+  font-weight:750;
+  line-height:1.4;
+  letter-spacing:-.2px;
+  text-align:left;
+  overflow-wrap:anywhere;
+  cursor:pointer;
+}
+.product-title-button:hover{color:var(--green)}
+.product-title-button:focus-visible{
+  outline:2px solid var(--green);
+  outline-offset:3px;
+  border-radius:3px;
+}
+.product-title-button.needs-details{
+  color:#9b5b1c;
+  font-style:italic;
+}
+.product-category{
+  max-width:calc(100% - 20px);
+}
+@media(max-width:700px){
+  .product-title-button{font-size:12px;min-height:3.1em}
+}
