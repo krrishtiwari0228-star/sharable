@@ -363,14 +363,14 @@ export default function Home() {
   const cartTotal = cart.reduce((n, line) => n + line.qty * line.product.price, 0);
   const productCategories = useMemo(() => ["All products", ...Array.from(new Set(products.map(p => p.category).filter(name => Boolean(name) && !/^\d+$/.test(name.trim())))).sort((a,b)=>a.localeCompare(b))], [products]);
   const filtered = useMemo(() => {
-    const eligible = products.filter(p => category === "All products" || p.category === category);
+    const eligible = products.filter(p => (role !== "dealer" || !isPlaceholderValue(p.name)) && (category === "All products" || p.category === category));
     const query = search.toLowerCase().trim();
     if (!query) return eligible;
     const matchingGroups = new Set(eligible
       .filter(p => ((isPlaceholderValue(p.name) ? "" : p.name) + " " + (isPlaceholderValue(p.sku) ? "" : p.sku) + " " + p.category + " " + p.brand).toLowerCase().includes(query))
       .map(getProductGroupKey));
     return eligible.filter(p => matchingGroups.has(getProductGroupKey(p)));
-  }, [products, category, search]);
+  }, [products, category, search, role]);
   const [selectedVariantByGroup, setSelectedVariantByGroup] = useState<Record<string, string>>({});
   const [selectedPhotoByProduct, setSelectedPhotoByProduct] = useState<Record<string, number>>({});
 
